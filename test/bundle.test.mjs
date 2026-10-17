@@ -279,6 +279,7 @@ function makeCtx() {
   const effects = [];
   const localeRegistrations = [];
   const tabTypes = [];
+  const shortcutCommands = [];
   const injections = [];
   const signalSubscribers = new Map();
 
@@ -324,6 +325,20 @@ function makeCtx() {
     sidebarRightTabs: {
       register: (definition) => {
         tabTypes.push(definition);
+        return () => undefined;
+      },
+    },
+    // 内核 shortcuts 服务：注册的快捷键命令进 `shortcutCommands` 供断言。
+    shortcuts: {
+      register: (command) => {
+        shortcutCommands.push(command);
+        return () => {
+          const at = shortcutCommands.indexOf(command);
+          if (at >= 0) shortcutCommands.splice(at, 1);
+        };
+      },
+      registerFixed: (command) => {
+        shortcutCommands.push(command);
         return () => undefined;
       },
     },
@@ -373,6 +388,7 @@ function makeCtx() {
       return (ctx.__openedResourcesStore ??= []);
     },
     __registrations: registrations,
+    __shortcutCommands: shortcutCommands,
     __tabTypes: tabTypes,
     __injections: injections,
     __effects: effects,
@@ -1733,6 +1749,58 @@ function stripCommentsAndStrings(code) {
   }
   return out;
 }
+
+
+test('Ctrl+T 注册为官方快捷键命令：等价于点 T 控件，且在输入框里生效', async () => {
+  // 用户 2026-10-18 要求「注册一个 dsh 内快捷键 ctrl+t，效果等同点了 t 控件」。
+  //
+  // 为什么必须走 `ctx.shortcuts` 而不是自己监听 keydown：
+  //   - 官方服务自带冲突检测（与内核同键会拒绝注册，而不是两方都触发）；
+  //   - 自带上下文判定（region / modal），不会在设置弹窗里误触发；
+  //   - 会出现在「快捷键」设置页里，用户还能改键。
+  const react = makeReact();
+  const exports = await loadBundle(react);
+  const ctx = makeCtx();
+  const store = memoryStorage();
+  withStorage('localStorage', store, () => {
+    withStorage('sessionStorage', undefined, () => {
+      exports.apply(ctx);
+    });
+  });
+
+  const commands = ctx.__shortcutCommands ?? [];
+  const command = commands.find((item) => item.id === 'dsh-enhanced-prompt-editor.cycle-mode');
+  assert.ok(command !== undefined, '必须注册 id 为 dsh-enhanced-prompt-editor.cycle-mode 的快捷键命令');
+
+  // ① 键位：Ctrl+T（跨平台用 primary：macOS 映射 Cmd，其余映射 Ctrl）
+  for (const runtime of ['desktop', 'web']) {
+    for (const platform of ['macos', 'windows', 'linux']) {
+      const binding = command.defaults?.[`${runtime}:${platform}`];
+      assert.ok(binding !== undefined, `缺少 ${runtime}:${platform} 的默认键位`);
+      assert.equal(binding.code, 'KeyT', `${runtime}:${platform} 的物理键必须是 KeyT`);
+      assert.deepEqual(binding.modifiers, ['primary'], '修饰键必须是 primary（Ctrl/Cmd）');
+    }
+  }
+
+  // ② ⚠️ region 必须包含 editable：用户就是在输入框里按的。
+  //    缺了它，在 composer 里按 Ctrl+T 会被判「不匹配」而静默不生效（本仓库踩过同类坑）。
+  assert.ok(Array.isArray(command.regions), '必须声明 regions');
+  for (const region of ['page', 'editable', 'terminal']) {
+    assert.ok(command.regions.includes(region), `regions 必须包含 ${region}（否则该区域按了没反应）`);
+  }
+  assert.ok(command.regions.includes('editable'), '⚠️ 缺 editable 会让输入框里的 Ctrl+T 静默失效');
+
+  // ③ 触发时必须真的切模式（等价于点 T 控件），而不是弹面板或什么都不做
+  const resolved = command.resolve({ region: 'editable', modal: null });
+  assert.equal(resolved?.status, 'handled', '在输入框里按 Ctrl+T 必须被当作已处理');
+  assert.equal(typeof resolved?.run, 'function', 'handled 必须带 run 回调');
+
+  const trigger = ctx.__registrations.find((entry) => entry.options.name === 'conversation.input.left');
+  const face = bindHooks(trigger.options.inject());
+  assert.equal(face.useMode((v) => v), 'native', '初始应为原生模式');
+  resolved.run();
+  assert.notEqual(face.useMode((v) => v), 'native', '⚠️ 触发快捷键后模式必须切换（等价于点 T 控件）');
+});
 
 test('导出 inject 必须覆盖源码里用到的每一个 ctx 服务（漏写会打挂整个 DSH 启动）', async () => {
   const { readFile: rf, readdir } = await import('node:fs/promises');

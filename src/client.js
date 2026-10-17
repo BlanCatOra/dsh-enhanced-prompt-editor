@@ -63,7 +63,7 @@ export const name = PLUGIN_ID;
  * （`settings-face.js`），它是可选依赖，写进 inject 就等于把本插件绑死在
  * 设置服务上。同理 `plugins.item` 是插槽名而不是服务，不需要声明。
  */
-export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight'];
+export const inject = ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight', 'shortcuts'];
 
 /**
  * 本地兜底翻译器。
@@ -347,6 +347,40 @@ function applySources(ctx, failures) {
           applyModeSurfaces(mode);
         }),
       `${PLUGIN_ID}: mode subscription`,
+    );
+  });
+
+  /* ── 0. 快捷键 Ctrl+T：等价于点 T 控件 ──────────────────────────── */
+  //
+  // 用内核的 shortcuts 服务注册（**不要自己抢 keydown**）：它自带
+  //   - 冲突检测（与内核/其它插件同键会拒绝注册，而不是两方都触发）；
+  //   - 上下文判定（region: page/editable/terminal；modal）；
+  //   - 「快捷键」设置页里可见、且用户可改键。
+  //
+  // ⚠️ region 必须包含 `editable`：用户就是在输入框里按的。缺了它，
+  //    在 composer 里按 Ctrl+T 会被判成「不匹配」直接放过（静默不生效）。
+  // ⚠️ 用 `primary` 而不是 `control`：primary 在 macOS 上映射 meta(Cmd)、
+  //    其余平台映射 control —— 与内核既有命令（Ctrl/Cmd+/ 打开快捷键表）一致。
+  guardStep(failures, 'shortcut:cycle-mode', () => {
+    ctx.effect(
+      () =>
+        ctx.shortcuts.register({
+          id: 'dsh-enhanced-prompt-editor.cycle-mode',
+          label: () => t('trigger.label'),
+          aliases: ['enhanced prompt editor', 'cycle mode', '切换输入框模式'],
+          defaults: {
+            'desktop:macos': { code: 'KeyT', modifiers: ['primary'] },
+            'desktop:windows': { code: 'KeyT', modifiers: ['primary'] },
+            'desktop:linux': { code: 'KeyT', modifiers: ['primary'] },
+            'web:macos': { code: 'KeyT', modifiers: ['primary'] },
+            'web:windows': { code: 'KeyT', modifiers: ['primary'] },
+            'web:linux': { code: 'KeyT', modifiers: ['primary'] },
+          },
+          // 三个 region 全要：输入框（editable）/ 页面（page）/ 终端（terminal）
+          regions: ['page', 'editable', 'terminal'],
+          resolve: () => ({ status: 'handled', run: () => void shared.modes.cycle() }),
+        }),
+      `${PLUGIN_ID}: shortcut cycle-mode`,
     );
   });
 

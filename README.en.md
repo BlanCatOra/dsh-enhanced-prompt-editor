@@ -183,11 +183,17 @@ keeps only the read-only plugin list"). Changes are written **only when you pres
 
 ## Keyboard
 
-| Key | Behavior |
+| Key | Action |
 |---|---|
+| `Ctrl/Cmd + T` | **Cycle the composer mode** (same as clicking the T button; works while typing) |
 | `Enter` | Adds a line (default), or sends if you invert the setting |
 | `Cmd/Ctrl + Enter` | Sends (default), or adds a line |
 | `Shift + Enter` | Always adds a line |
+
+`Ctrl/Cmd + T` goes through DSH's official shortcut service (`ctx.shortcuts`), so it shows up
+in **Settings → Shortcuts** and can be remapped; a conflicting binding is rejected at
+registration instead of double-firing; and it only fires in the page / composer / terminal
+regions, never inside a settings modal.
 
 Enter during IME composition is **never intercepted** — that belongs to the candidate list, so it goes back to the browser.
 
