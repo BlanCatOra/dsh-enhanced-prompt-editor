@@ -1,0 +1,50 @@
+#!/bin/sh
+# 推送前硬闸。启用：git config core.hooksPath .githooks
+#
+# 为什么需要：仓库按「宿主直接加载 lib/client.js」运行，**改了 src 忘了 build**
+# 时测试可能仍绿（测试跑的是 src），但真机行为不变 —— 属于静默失效。
+# 这里在推送前把「构建 / 测试 / 产物同源 / 脱敏」全部再验一遍。
+#
+# 逃生门：git push --no-verify（仅在明确知道自己在推什么时使用，例如只改文档）。
+
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+echo "==> [1/4] 构建 + 全量测试"
+npm test
+
+echo "==> [2/4] 产物同源：lib/client.js 必须由当前 src 构建而来"
+# 重新构建一遍再比对：若 lib 与刚构建出来的不一致，说明提交里是旧产物。
+npm run build >/dev/null 2>&1
+if ! git diff --quiet -- lib/client.js; then
+  echo "❌ lib/client.js 与当前 src 不同源（提交了旧产物）。" >&2
+  echo "   修复：npm run build && git add lib/client.js && git commit --amend" >&2
+  exit 1
+fi
+
+echo "==> [3/4] 脱敏：产物与公开文档不得含本机私有信息"
+BAD=$(grep -rnE '/home/[a-z][a-zA-Z0-9_-]*|192\.168\.[0-9]+\.[0-9]+' \
+  README.md README.en.md AGENTS.md llms.txt docs/ 2>/dev/null \
+  | grep -v 'abs/path/to' || true)
+if [ -n "$BAD" ]; then
+  echo "❌ 公开文件里出现本机绝对路径或内网 IP：" >&2
+  echo "$BAD" >&2
+  exit 1
+fi
+# 私人邮箱（agent 公开邮箱除外）
+BAD2=$(grep -rnE '[A-Za-z0-9._+-]+@qq\.com' README.md README.en.md AGENTS.md llms.txt docs/ 2>/dev/null \
+  | grep -v 'blancatora@agent.qq.com' || true)
+if [ -n "$BAD2" ]; then
+  echo "❌ 公开文件里出现非 agent 的 qq.com 邮箱：" >&2
+  echo "$BAD2" >&2
+  exit 1
+fi
+
+echo "==> [4/4] 工作区干净"
+if ! git diff --quiet; then
+  echo "❌ 工作区有未提交改动，先提交再推。" >&2
+  git status --short >&2
+  exit 1
+fi
+
+echo "✅ 推前检查全部通过"

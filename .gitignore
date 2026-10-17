@@ -1,0 +1,24 @@
+# 依赖
+node_modules/
+
+# pnpm
+.pnpm-store/
+pnpm-debug.log*
+
+# 构建产物：lib/client.js 由 src/build-client.mjs 生成。
+# 这里**不忽略**它，因为 DSH 浏览器侧直接消费该文件，
+# 而 profile 用 file: 依赖挂载本仓库时读到的是工作区里的实际文件。
+# 若改为 npm 发布，应改为忽略并在 prepublish 时生成。
+# lib/
+
+# 编辑器与系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# 日志与临时文件
+*.log
+*.tmp
+.cache/

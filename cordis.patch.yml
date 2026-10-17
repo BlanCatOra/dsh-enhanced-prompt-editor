@@ -1,0 +1,12 @@
+# dsh-enhanced-prompt-editor —— 输入框长 prompt 编辑面板。
+#
+# 这一行只把插件本身挂进 profile；所有可调项都在「设置 → 增强的提示词编辑器」
+# 页面里（存储方式、落盘目录、回车/发送键位、听写开关），不需要改这里。
+- insert:
+    - id: dsh-enhanced-prompt-editor
+      name: dsh-enhanced-prompt-editor
+      config:
+        # 落盘目录：相对于会话工作区根。仅 storage=workspace 时使用。
+        dir: .dsh/prompts
+        # 面板默认高度（像素）。仅影响首次打开。
+        panelHeight: 420

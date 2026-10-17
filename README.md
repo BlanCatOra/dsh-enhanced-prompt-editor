@@ -1,0 +1,377 @@
+<h1 align="center">增强的提示词编辑器</h1>
+
+<p align="center"><b>在输入框旁写长 prompt，写完直接发送或用内置阅读器留存。</b></p>
+
+<p align="center">
+  <code>dsh-enhanced-prompt-editor</code> ·
+  <a href="README.en.md">English</a> ·
+  <a href="CHANGELOG.md">更新日志</a> ·
+  <a href="LICENSE">MIT</a>
+</p>
+
+---
+
+
+> 🤖 **给 AI agent**：动手改这个仓库之前，先读 [AGENTS.md](./AGENTS.md)（**怎么改**：
+> 验证命令、硬性约束、本仓库特有的坑）与 [llms.txt](./llms.txt)（**怎么用**：能力与文档索引）。
+> 人类可以忽略这一行，直接往下看。
+
+## 为什么需要它
+
+DSH 的输入框适合写短消息。要写几百行的 prompt 时，那个小框有三个具体问题：
+
+1. **框太小** —— 长 prompt 在里面只剩几行可见，改一处要来回滚；
+2. **回车即发送** —— 想换行得按 `Shift+Enter`，写多段结构时很别扭；
+3. **留不下来** —— 辛苦写的 prompt 发送后就散了，下次想复用只能翻历史。
+
+本插件把「写长 prompt」这件事从输入框里拆出来：
+
+- 输入框工具栏加一个 **T** 按钮，点开右侧栏的**独立编辑面板**；
+- 面板整块区域都是编辑区，可以和对话**并排看**；
+- 草稿能落成工作区里的 **`.md` 文件**，因此**能被 DSH 内置的文件阅读器直接打开**；
+- 面板右下角有**发送**与**听写**，回车行为**可以在设置里改**。
+
+## 界面
+
+### 编辑器模式（右侧栏大面板）
+
+![编辑器模式：右侧栏面板，自动行号 + 隔行底色 + 符号工具条](docs/screenshots/panel-editor.jpg)
+
+126 行的长 prompt（就是 [`docs/demo-long-prompt.md`](./docs/demo-long-prompt.md) 那份）
+在面板里仍然一行一色、行号连续，右侧工具条按 Markdown 常用结构分组。
+
+### 扩展输入框模式（原生输入框加高 + 悬浮符号条）
+
+![扩展输入框模式：输入框向上加高，上方悬浮符号/缩进工具条](docs/screenshots/extended-mode.jpg)
+
+原生输入框就地加高，行号与隔行底色跟着**草稿文本**走；上方是悬浮 deck。
+
+### 原生模式 + 悬浮 deck（不切模式）
+
+![原生模式：不切模式也能在输入框上方显示 deck](docs/screenshots/native-deck.jpg)
+
+在插件设置里勾上「在原生输入框应用悬浮 deck」，原生输入框上方也会出现同一条 deck。
+
+### 各部位形态
+
+| 位置 | 形态 |
+|---|---|
+| 输入框工具行 | 28px 圆钮，主体字形 `T`，右下角叠一枚**模式角标**（面板图标 = 编辑器模式 / 向上箭头 = 扩展输入框模式 / 无角标 = 原生） |
+| 右侧栏 | 独立 tab：工具栏（草稿名 / 保存 / 用阅读器打开 / 清空）+ 大编辑区 + 状态栏（字数 · 存储方式 · 听写 · 发送） |
+| 原生输入框 | 扩展输入框模式下向上加高（最高高度可设） |
+| 插件页 | 侧栏「插件」→「增强的提示词编辑器」→ 自己的配置页 |
+
+### 三种模式
+
+点 T 会在**已启用的模式**之间循环，最后回到「原生」：
+
+| 模式 | 效果 |
+|---|---|
+| **编辑器模式** | 点 T 在右侧栏打开 Markdown 编辑面板 |
+| **扩展输入框模式** | DSH 原生输入框**立刻**向上展开到设定的高度，且可单独决定回车语义 |
+| **原生** | 两个增强都不生效（点 T 只是循环回来） |
+
+切模式会**收掉上一个模式的界面**：从编辑器模式切走时，右侧栏的面板会自动关闭
+（草稿不丢，切回来还在），不会两个增强同时占着地方。
+
+两个模式可以在插件页里独立勾选、并决定谁排在前面；两个都关掉时 T 变暗、不做任何事。
+切到**扩展输入框模式**时会弹一条明确的横幅提醒（顶部居中，6 秒后自动消失）。
+
+> ⚠️ 按钮**不再有悬停提示框**（原生 `title` 会弹出显示插件名的系统气泡）。
+> 当前模式改由角标表达，可访问名称走 `aria-label`，不产生视觉浮层。
+
+### 按钮位置说明（重要）
+
+T 按钮注册进 DSH 的 `conversation.input.left` 插槽（session 级 list），因此实际排在：
+
+```
+[+] 附件/命令   [权限控件]   [计划控件]   [T]
+```
+
+DSH **没有**提供「加号与权限控件之间」的插槽。`conversation.input.left` 是该区域唯一稳定的公开接入点，所以本插件没有用 CSS 强行重排核心 DOM——那会在 DSH 升级时静默错位。
+
+按钮是**常驻**的：只要会话存在就显示，与当前选了哪个模型、哪个 provider 无关（这一点与 `dsh-connect-workbuddy` 的积分读数不同，那个是 provider 专属的门控渲染）。
+
+想先看看它长什么样？[`docs/demo-long-prompt.md`](./docs/demo-long-prompt.md) 是一份
+**126 行 / 5.2KB 的真实长 prompt 示例**（12 个标题、4 段代码块、1 张表格、6 条验收项），
+可以直接复制粘进面板，用来截图或自测行号、隔行底色、多行编辑效果。
+
+## 安装
+
+本插件是本地包（`file:` 依赖），挂法与 `dsh-cetus` / `dsh-email` 一致。
+
+**1. 在 profile 里加依赖与 bundle 条目**（`~/.dsh/profiles/desktop/package.json`）：
+
+```json
+{
+  "dependencies": {
+    "dsh-enhanced-prompt-editor": "file:/abs/path/to/dsh-enhanced-prompt-editor"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": ["…", "dsh-enhanced-prompt-editor"]
+    }
+  }
+}
+```
+
+**2. 装依赖：**
+
+```sh
+cd ~/.dsh/profiles/desktop
+/usr/lib/deepseek-harness-desktop/resources/runtime/primary-runtime/dependencies/pnpm/bin/pnpm.mjs install
+```
+
+**3. 重启 DSH 应用。**
+
+> 客户端 bundle 只在应用启动时注册，因此**必须重启**才会生效。
+
+## 设置
+
+**侧栏「插件」→ 找到本插件 → 在它自己的页面上配置**（不是「设置」总页——
+那是 DSH 的现行规范：「注册了配置页的插件在这里、在它自己的页面上编辑」）。
+改动**只有点「保存」才写入**。
+
+| 项 | 默认 | 说明 |
+|---|---|---|
+| 编辑器模式 | 开 | 点 T 打开右侧栏面板 |
+| 扩展输入框模式 | 开 | 原生输入框向上加高 |
+| 循环顺序 | 编辑器 → 扩展输入框 | 两个模式都启用时生效 |
+| 扩展输入框的回车 | 跟随 DSH | `跟随 DSH`（回车发送）或 `回车换行`（`Cmd/Ctrl+Enter` 才发送） |
+| 扩展输入框高度 | 640px | 240–2000 |
+| 草稿存储 | 工作区 `.md` 文件 | `工作区 .md 文件` / `仅浏览器本地` / `不保存` |
+| 落盘目录 | `.dsh/prompts` | 相对于会话工作区根 |
+| 面板内的回车 | 回车换行 | 只影响右侧栏面板 |
+| 面板高度 | 420px | 180–1400 |
+| 编辑区字号 | 16px | 11–28 |
+| 快捷键按钮大小 | 100% | 80–180 |
+| 允许用内置阅读器打开 | 开 | 关掉后不写工作区文件 |
+| 显示听写按钮 | 开 | 需已安装语音转文字插件 |
+
+> ⚠️ **DSH 自己没有「Enter 是换行还是发送」这个设置。** 它的「回车行为」只管
+> 智能体**忙碌时** Enter 走排队还是插话，与换行无关；原生裸回车恒为发送。
+> 所以「扩展输入框的回车」是本插件为扩展输入框新加的能力，默认不改变宿主行为。
+>
+> ⚠️ 面板内的回车设置**只影响右侧栏面板**，两者互不干扰。
+
+## 快捷键
+
+| 按键 | 行为 |
+|---|---|
+| `Enter` | 换行（默认）或发送（可在设置里反转） |
+| `Cmd/Ctrl + Enter` | 发送（默认）或换行 |
+
+### 快捷键行
+
+编辑区下方有一排符号按钮，鼠标点击即插入：
+
+- **成对符号**：`()` `[]` `{}` `""` `''` `` ` `` `（）` `「」` `『』` `【】` `《》`
+- **Markdown 常用**：`**` `*` `~~` ` ``` ` `#` `-` `>` `[]()` `![]()` `---`
+- **粘贴**：在光标处粘贴剪贴板内容
+
+**选中文字后点成对符号会把文字框在符号内**，而不是把框选的文字改成符号：
+
+| 操作 | 结果 |
+|---|---|
+| 选中 `abc`，点 `()` | `(abc)`，且 `abc` 仍被选中 |
+| 再点 `**` | `(**abc**)` |
+| 不选中，点 `()` | `()`，光标在中间 |
+
+**编辑区逐行条纹**：每行背景深浅交替，方便逐行扫读（焦点在编辑区时条纹偏品牌色）；
+左侧另有**行号沟槽**，随编辑区一起滚动。
+
+**一键缩进**：`→` 给选中行各加两个空格；`←` 去掉一层缩进。
+
+### 模式二（扩展输入框）也有同一排符号
+
+扩展输入框模式下，输入卡上方会出现同一排符号按钮，行为与面板里完全一致。
+两处共用一份符号表与规则（`src/edit-ops.js`），所以「包裹选中文字」的语义在
+两个模式里天然相同。
+
+写入走内核的官方程序化插入通道（`inputActions.captureInsertion()` +
+`insertText(text, span)`），而不是直接操作 Lexical 内部结构。
+
+### 字号与按钮大小
+
+插件页里可调「编辑区字号」（11–28px）与「快捷键按钮大小」（80–180%）。
+字号是 CSS 变量，条纹行高会自动跟随。
+| `Shift + Enter` | 恒为换行 |
+
+输入法组合期间的回车**不拦截**——那是候选词确认，交还浏览器。
+
+## 语音听写
+
+复用 DSH 语音转文字插件的 `remote.speech`（`catalog` / `transcribe`），自己采集音频并编成宿主接受的 **16 kHz 单声道 PCM16 WAV**。
+
+语音插件是**可选**依赖：用 `ctx.inject(['remote.speech'])` 解析，因此它的加载顺序无关紧要；未安装时听写按钮不渲染。
+
+## 权限与数据
+
+插件会碰你的什么，一次说清：
+
+| 能力 | 用途 | 边界 |
+|---|---|---|
+| **写文件** | 把草稿写成工作区里的 `.md` | 只写**当前会话工作区之内**；目录与文件名都经 Host 侧校验，越界即拒 |
+| **读文件** | 读回自己的草稿、列举草稿目录 | 同上，仅工作区内 |
+| **麦克风** | 听写（仅在你点「听写」后） | 音频经 DSH 语音插件识别，本插件不留存录音 |
+| **写入输入框** | 点「发送」时把文本交给会话 | 经 `setDraft` + `submit`，不直接构造模型请求 |
+| **注册 HTTP 路由** | 落盘接口 | 只监听 loopback，校验 `Origin`，单次 body 上限 1 MiB |
+
+**不做的事**：不联网、不读取工作区外的文件、不采集遥测、不在插件目录外写任何文件、不在你未点击时访问麦克风。
+
+**草稿存在哪**：由设置里的「草稿存储」决定——工作区 `.md` 文件（默认）、浏览器 localStorage、或完全不存。选「仅浏览器本地」时一个文件都不会写。
+
+**卸载后残留**：已落盘的 `.md` 草稿留在工作区里（那是你的文件，插件不擅自删）；localStorage 键为 `dsh.enhancedPromptEditor.draft`（草稿）与 `dsh.enhancedPromptEditor.mode`（当前模式）。
+
+**扩展输入框模式改了什么**：只在该模式下临时覆盖输入卡的 CSS 变量
+`--dsh-composer-text-max-height`，切离时摘掉；不改结构、不重排 DOM。
+
+## 安全
+
+落盘走本插件 Host 侧的 **loopback-only 同源路由**（DSH 自带的 `workspace-files` Remote 只有读能力，无法写文件）。
+
+| 防线 | 做法 |
+|---|---|
+| 路径逃逸 | 客户端传来的目录/文件名**一律不可信**；Host 侧解析后断言最终路径仍在会话工作区内（`assertInside`），越界即拒 |
+| 跨站请求 | 校验 `Origin`，非本机来源返回 403 |
+| 请求体积 | 单次 body 上限 1 MiB |
+| 危险文件名 | 含路径分隔符/控制字符的名字降级为 `draft.md`，而不是报错 |
+
+这些边界都有真实起 HTTP 服务的端到端测试覆盖（`test/host-route.test.mjs`）。
+
+## 开发
+
+```sh
+pnpm run build   # 从 src/ 生成 lib/client.js
+pnpm test        # 构建 + 全部测试
+pnpm run check   # 语法检查
+```
+
+> **`lib/client.js` 是生成物，不要手改。** 改 `src/` 后必须重新 `pnpm run build`。
+
+### 为什么自带一个打包器
+
+DSH 浏览器侧只消费**一个** `./client` bundle，`window.__ModuleLoader__` 只把 `./` 开头的请求解析到同包分块。本项目不引入构建工具链，因此 `src/build-client.mjs` 用约 200 行把 `src/*.js` 合成一个自包含 factory：既保留模块边界（可单测、可复用），又满足单文件交付。
+
+它刻意只支持一个**窄语法子集**（相对 `import`、`export function/const/class`、`export {}`），遇到不支持的写法**直接报错**——静默产出一个「能跑但行为不对」的 bundle，比构建失败难查得多。
+
+### 构建期产物守卫
+
+`src/build-client.mjs` 里的 `assertBundleShape()` 在写盘前断言两件事：
+
+1. `new Function(code)` 能解析产物——语法坏掉立即构建失败。最容易踩的是
+   **模板字符串内部注释里的反引号**会提前闭合字符串，真机表现是白屏 +
+   `import failed` 且**没有任何堆栈**；
+2. 产物里的外部模块请求只允许**前端 boot 冻结基座那 9 个**（`react`、
+   `react/jsx-runtime`、`react-dom`、`react-dom/client`、`@deepseek-ai/cordis`、
+   `@deepseek-ai/dsh-client-store`、`@deepseek-ai/dsh-client-ui-slots`、
+   `@deepseek-ai/dsh-client-ui-primitives`、`@deepseek-ai/dsh-client-ui-dockkit`）。
+   表外的 `require` 在真机上必然失败。
+
+### UI 组件的来源
+
+界面控件**一律**来自 `@deepseek-ai/dsh-client-ui-primitives`（`Button`、`Switch`、
+`Menu`、`SettingsForm` …），不自己写按钮/下拉/SVG。它是前端 seed 表里的冻结基座
+模块，`require` 一定成功；官方 10 个配置页里有 9 个都这么做。
+
+发布流程与脱敏红线见 [`docs/RELEASING.md`](./docs/RELEASING.md)（推前硬闸：`.githooks/pre-push`）。
+
+## 项目结构
+
+```
+src/
+  constants.js        共享常量与纯函数（回车语义、路径规范化、标题）
+  config.js           Host 配置 schema + volatile 活引用的解析
+  paths.js            路径安全（assertInside / draftFileName / 列表）
+  index.js            Host 侧：同源路由（落盘 / 回读 / 列举）
+  client.js           浏览器入口：组装三个表面
+  css.js              容错的样式注入（渲染期绝不抛错）
+  store.js            跨表面共享的草稿状态
+  settings-face.js    设置读写面（跟随 configForms 的上线/下线）
+  io.js               落盘 / 浏览器存储 / 发送
+  audio.js            麦克风采集与 WAV 编码
+  composer-trigger.js 工具行 T 按钮（模式角标 + 横幅提醒）
+  mode-controller.js  模式状态机（editor / extended / native 的循环与持久化）
+  native-composer.js  扩展输入框模式：覆盖 CSS 变量 + 捕获阶段接管 Enter
+  panel.js            右侧栏编辑面板
+  plugin-card.js      插件详情页的配置卡片（primitives + SettingsForm）
+  locale.js           中英文案
+  build-client.mjs    自建打包器
+lib/
+  client.js           生成物
+test/                 单元 + 集成 + electron 离屏几何
+  unit.test.mjs       纯函数（模式状态机、回车语义、路径安全、WAV 编码、volatile 解析、样式注入容错、扩展输入框的 DOM 与事件处理）
+  bundle.test.mjs     真的执行 lib/client.js，验证接线、插件卡片与静态守卫
+  host-route.test.mjs 真的起 HTTP 服务，验证安全边界（9 项）
+```
+
+## 已知陷阱（写插件时踩过的，别再踩）
+
+### 插槽的 `inject()` 返回值会被缓存，永不重算
+
+插槽渲染器把 `entry.inject(...)` 的结果按 `(entry, binding)` 缓存进 WeakMap
+（内核 `cachedSessionInject`），**没有任何失效路径**。所以：
+
+- ❌ `inject: () => ({ mode: 当前模式 })` —— 值**永久冻在第一帧**，
+  点按钮后界面不会更新（本插件的 T 角标就栽在这里，且**不报错**）；
+- ✅ `inject: () => ({ hooks: { mode: 快照源 } })` —— 渲染器把快照源绑成组件 prop
+  `useMode()`，组件在渲染期调用即拿到最新值并自动订阅。
+  官方 `dsh-client-ui-settings-subagent` 正是这个写法。
+
+### 输入框高度是 `max-height`（上限）不是高度
+
+内核 `.scroll{max-height:var(--dsh-composer-text-max-height)}`，空输入框只有 36px。
+想「一切换就展开」必须同时给 `min-height`。
+
+### 关右侧栏的 tab ≠ 收起右侧栏
+
+内核《默认页与关闭规则》原文：停靠面的最后一个 tab 有一条规则，**仅当**它是「唯一停靠
+tab」时，关闭才会**连同整列一起收起**。而停靠面**永远不为空**（会自动填充引导页），
+所以插件自己的 tab 几乎从不唯一 —— `close(tabId)` 只关 tab，**右侧栏那一列照样开着**。
+
+要真的收起，必须自己调 `isExpanded()` / `toggleExpanded()`（都是公开 API）。
+判断要不要收：在**进入**之前记一次 `isExpanded()`，只在「本来收起、因我们才展开」
+时才由我们收回，否则会擅自关掉用户自己开着的侧栏。
+
+### 撑高输入框：`min-height` 给**编辑区**，不是给滚动容器
+
+扩展输入框的 DOM 是 `.scroll[data-input-scroll] > .grow > .input[data-composer-input]`。
+
+- `max-height` 给 `[data-input-scroll]`：内容超长后在那里滚动。
+- `min-height` **必须给 `[data-composer-input]`（contenteditable 本身）**。
+
+⚠️ 把 `min-height` 给滚动容器会造出一整片**点不动的死区**：容器被撑到 N px，
+而编辑区仍是 36px（内核 `.input{min-height:36px}`），中间 `N − 36` px 里没有任何
+可聚焦元素；而且内核 `onCardMouseDown` 里有一句
+`if (scrollRef.current?.contains(target)) return;` —— **落在滚动区内的点击宿主故意
+不处理**（它假定那里都是编辑区）。给编辑区设 `min-height` 后两者同高，死区为零。
+
+### CSS 渐变的色标必须写 `var(--x)`，漏掉 var() 会让整条声明失效
+
+`repeating-linear-gradient(var(--stripe) 0, ...)` 是对的；写成
+`repeating-linear-gradient(--stripe 0, ...)`（漏 `var()`）时，那个位置既不是颜色
+也不是长度 —— **整条 `background-image` 被判无效并回落到 `none`**，
+表现是「条纹一条都不显示」而控制台不报任何错。测试要断言渐变里出现了
+`var(--名称)`，只断言「有 repeating-linear-gradient」是抓不住的。
+
+### 悬浮提示的 key 必须真的存在
+
+`title: t('symbol.<key>.hint')` 在 `symbol.<key>.hint` 不存在时会**显示裸 key**
+（`symbol.paren.hint`）。测试要断言提示文本里不含 `symbol.` / `panel.` 前缀。
+
+### 别把状态写在会被宿主重挂的元素上
+
+`.composerSeat` 会在会话切换时重新挂载。挂在它（内联样式/属性）上的东西会丢；
+挂在 `<html>` 上、用属性选择器命中，才扛得住重挂。
+
+## 已知限制
+
+- **发送会替换主输入框草稿** —— 走 `setDraft` + `submit`，不追加、不回填。
+- **每个会话一个面板** —— tab 类型未设 `multiple`，重复点 T 是聚焦已有 tab。
+- **只写工作区内** —— 工作区外的路径一律拒绝，这是刻意的。
+- **语音识别能力由语音插件决定** —— 时长上限、语言、模型准备状态都不由本插件控制。
+- **PDF/Office 等格式的预览由 DSH 内置阅读器负责** —— 本插件只负责把 `.md` 交给它。
+
+## 许可
+
+[MIT](LICENSE) © 2026 blancat

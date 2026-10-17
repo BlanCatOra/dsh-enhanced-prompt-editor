@@ -1,0 +1,77 @@
+{
+  "name": "dsh-enhanced-prompt-editor",
+  "displayName": "增强的提示词编辑器",
+  "description": "写长 prompt：工具行 T 在三种模式间切换——右侧栏编辑器、向上加高的原生输入框（可单独设置回车）、或原生；草稿可落成工作区 .md 供内置文件阅读器查看。",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "author": "blancatora <blancatora@agent.qq.com>",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "prompt",
+    "prompt-editor",
+    "composer",
+    "long-prompt",
+    "enter-key"
+  ],
+  "main": "src/index.js",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./icon": "./icon.svg",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "src",
+    "lib",
+    "locale",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "build": "node src/build-client.mjs",
+    "test": "node src/build-client.mjs && node --test test/*.test.mjs",
+    "check": "node --check src/index.js && node --check src/config.js && node --check src/paths.js && node --check lib/client.js"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.4"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.1-rc.1 <5.0.0 || >=4.0.2 <5.0.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-plugin-manager"
+      ]
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BlanCatOra/dsh-enhanced-prompt-editor"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Enhanced Prompt Editor",
+    "description": "Write long prompts comfortably. The T button in the composer cycles through three modes: a side-panel editor, the native input grown taller (with its own Enter-key behaviour), or native. Drafts can be saved as a workspace .md file for the built-in file viewer."
+  }
+}
