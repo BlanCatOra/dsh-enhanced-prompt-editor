@@ -118,6 +118,15 @@ alternating stripes, and multi-line editing.
 
 ## Installation
 
+### Compatible DSH versions
+
+- Verified on **DSH 0.2.1-rc.2** (bundled runtime `0.2.1-rc.2`);
+  `package.json` declares `engines.dsh: ">=0.2.1-rc.1"`.
+- Older versions (e.g. `0.2.1-alpha.2`) behave the same, but are not regression-tested
+  across the whole range. If the host does not satisfy `engines.dsh`, DSH reports a
+  compatibility diagnostic on the plugin page instead of failing halfway.
+- Requires Node `^22.19.0 || >=24.0.0` (provided by the DSH runtime; usually nothing to install).
+
 This is a local package (a `file:` dependency), mounted the same way as `dsh-cetus` and `dsh-email`.
 
 **1. Add the dependency and bundle entry** to `~/.dsh/profiles/desktop/package.json`:

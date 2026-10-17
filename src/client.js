@@ -404,7 +404,8 @@ function applySources(ctx, failures) {
   //   最终明确：「**在输入框上方悬浮**」。
   //
   // ⚠️ 落点必须读内核源码定，不能凭名字猜。内核
-  // `@deepseek-ai/dsh-client-ui-conversation` 的 InputBar 实测（0.2.1-alpha.2）：
+  // `@deepseek-ai/dsh-client-ui-conversation` 的 InputBar 实测（0.2.1-rc.2；
+  // alpha.2 时结论相同，升级后已复核）：
   //  - `composerStack` 的 children 顺序是
   //    `[HeroShell, heroWorkspaceRow, conversation.input.dock, inputBar]`
   //    → `input.dock` 在**整张卡之前**（卡外上方）。

@@ -84,7 +84,7 @@ function makePrimitives(react) {
   }
   // `SettingsFormModel` 是**有状态的真实实现**，不能只是占位：卡片的行为
   // （暂存草稿、只有保存才写、非法草稿阻止保存）都由它决定，桩掉它就等于
-  // 把要测的逻辑一起桩掉了。这里按内核 0.2.1-alpha.2 的实际语义实现子集。
+  // 把要测的逻辑一起桩掉了。这里按内核 0.2.1-rc.2 的实际语义实现子集。
   exports.SettingsFormModel = class SettingsFormModelStub {
     constructor(scope, specs) {
       this.scope = scope;

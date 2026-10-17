@@ -6,7 +6,7 @@
  *
  * ## 为什么是「改 CSS 变量」而不是「插一个自己的输入框」
  *
- * 内核 `dsh-client-ui-conversation` 的实测事实（0.2.1-alpha.2）：
+ * 内核 `dsh-client-ui-conversation` 的实测事实（0.2.1-rc.2 复核；alpha.2 时相同）：
  *
  *  - 输入框滚动区的高度上限由一个 CSS 变量决定：
  *    `.scroll{max-height:var(--dsh-composer-text-max-height)}`，

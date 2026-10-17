@@ -45,6 +45,28 @@ md5sum lib/client.js ~/.dsh/profiles/desktop/node_modules/dsh-enhanced-prompt-ed
 
 ---
 
+## 1.5 版本基线（改代码前先读）
+
+| 项 | 值 | 怎么查 |
+|---|---|---|
+| 验证基线 | **DSH 0.2.1-rc.2**（runtime `0.2.1-rc.2`） | `python3` 读 asar 内 `/dsh/package.json` 的 version |
+| Arch 包版本 | `0.2.1rc.2-1` | `pacman -Q deepseek-harness-desktop` |
+| 声明范围 | `engines.dsh: ">=0.2.1-rc.1"` | `package.json` |
+| Node | `^22.19.0 || >=24.0.0` | `package.json` |
+
+⚠️ **三层版本别混**（排查时最容易错）：Arch 包版本 `0.2.1rc.2-1`、
+内置 runtime `0.2.1-rc.2`、内核 checkout 在
+`/usr/lib/deepseek-harness-desktop/resources/app.asar/dsh/`。
+
+⚠️ **内核 seed 表会随版本变长**：rc.2 已从 9 项增至 11 项（新增 `zod`、
+`@tanstack/react-virtual`），但本插件的构建白名单**故意不跟随**（用不到就不放行，
+越窄越安全）。要放行新模块，必须先在产物里确认真的需要。
+
+⚠️ **seed 表函数名每次构建都变**（alpha.2 是 `gM()`，rc.2 是 `SZ()`）。
+**按 `staticModules` 定位，不要按函数名 grep。**
+
+---
+
 ## 2. 产物
 
 | 文件 | 是什么 | 要提交吗 |
@@ -54,7 +76,7 @@ md5sum lib/client.js ~/.dsh/profiles/desktop/node_modules/dsh-enhanced-prompt-ed
 
 - **不要手改 `lib/`**，只改 `src/` 然后 `npm run build`。
 - 浏览器执行的是 `lib/client.js`，**不是 `src/`**：改了 `src/` 不构建，真机行为不变。
-- 客户端 bundle 只允许 `require` seed 表里的 **9 个**模块
+- 客户端 bundle 只允许 `require` `build-client.mjs` 的 `SEED_MODULES` 白名单（内核 seed 表 11 个的子集，当前放行 9 个）
   （`react`、`react/jsx-runtime`、`react-dom`、`react-dom/client`、
   `@deepseek-ai/cordis`、`@deepseek-ai/dsh-client-store`、
   `@deepseek-ai/dsh-client-ui-slots`、`@deepseek-ai/dsh-client-ui-primitives`、

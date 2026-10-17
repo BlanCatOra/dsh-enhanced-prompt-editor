@@ -149,10 +149,17 @@ async function collect(entryPath, rootDir) {
 /**
  * 前端 boot 的 seed 表（冻结基座模块）。
  *
- * 逐字来自内核 `dsh-web-frontend/dist/assets/index-*.js` 的 `function gM()`
- * （0.2.1-alpha.2 实测），它被传给 `__ModuleLoader__.create({ staticModules })`。
- * **只有这 9 个 `require` 一定成功**；表外的任何 `@deepseek-ai/*` 都会在
+ * 逐字来自内核 `dsh-web-frontend/dist/assets/index-*.js` 的 seed 表函数
+ * （**0.2.1-rc.2 实测**：函数名 `SZ()`；0.2.1-alpha.2 时叫 `gM()`，名字每次
+ * 构建都会变，**不要按函数名去 grep，按 `staticModules` 定位**），它被传给
+ * `__ModuleLoader__.create({ staticModules })`。
+ * **只有表内的 `require` 一定成功**；表外的任何 `@deepseek-ai/*` 都会在
  * 真机上 require 失败 → `import failed` → 整页白屏（且没有堆栈）。
+ *
+ * ⚠️ **内核 seed 表会随版本变长，本白名单故意保持"够用即可"**：
+ * rc.2 的 seed 表已扩到 11 项（新增 `zod`、`@tanstack/react-virtual`），
+ * 但本插件**用不到**它们，所以不放行 —— 白名单越窄越安全（用不到的模块一旦
+ * 被误引入，构建期就会拦下）。要新增条目，必须先在产物里确认真的需要。
  *
  * 用户 2026-10-15 裁定：UI 组件一律用 `primitives`（官方 10 个配置页里 9 个
  * 都 require 它，它是 seed 表成员，不是"跨包风险"）。所以白名单从原来的
@@ -225,7 +232,7 @@ export function assertNoBacktickInsideCssTemplate(source, filePath) {
  *  1. `new Function(code)` 解析产物——语法坏掉立即构建失败。最容易踩的是
  *     **模板字符串内部注释里的反引号**会提前闭合字符串（真机表现：白屏 +
  *     `import failed`，没有任何堆栈）。
- *  2. 扫产物里真正的**外部模块请求**，只允许 seed 表那 9 个模块。
+ *  2. 扫产物里真正的**外部模块请求**，只允许 `SEED_MODULES` 白名单里的模块。
  *
  * ⚠️ 第 ② 条必须扫 `__dshExternal("<name>")`，**不能**扫 `require("name")`：
  * 打包器把源码里的 `import ... from 'x'` 改写成 `__dshExternal('x')`，产物里

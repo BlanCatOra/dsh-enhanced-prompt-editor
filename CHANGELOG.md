@@ -6,6 +6,29 @@
 
 ## [Unreleased]
 
+### 兼容性
+
+- **已在 DSH 0.2.1-rc.2 上验证通过**（内置 runtime `0.2.1-rc.2`，Arch 包
+  `0.2.1rc.2-1`；此前基线为 `0.2.1-alpha.2`）。
+  - 插件加载正常：Host 侧同源路由实测返回 200，客户端 bundle 与 `src/` 同源，
+    升级后无新增崩溃日志；
+  - 内核契约复核通过：`data-composer-card` / `data-composer-overlay` /
+    `data-composer-input` / `data-composer-seat` 与
+    `--dsh-composer-text-max-height` 全部仍在；
+  - `composerStack` 的 children 顺序（`input.dock` 在卡片外上方）未变，
+    所以 deck 与 T 按钮的落点逻辑无需调整；
+  - rc.1 公布的破坏性变更本插件均未踩到（不涉及 `invariant` 导出、
+    `toolPresentation: both`、`azure-openai-responses` 改名、输入区 `stats` 拆分、
+    `agent-instructions` 的 `dshHome`）；
+  - 会话格式 v4→v4、workspace 存储 v2→v2，**数据零迁移**。
+- **`engines.dsh` 显式声明 `>=0.2.1-rc.1`**。rc.2 新增了该字段的兼容判定：
+  未声明时回退到旧的 `peerDependencies` 规则；显式声明后宿主可提前给出
+  「版本不满足」的诊断，而不是加载到一半才失败。
+- **内核 seed 表扩容但白名单不跟随**：rc.2 的前端 seed 表从 9 项增至 11 项
+  （新增 `zod`、`@tanstack/react-virtual`）。本插件用不到这两项，构建期白名单
+  **保持不变**（越窄越安全：用不到的模块一旦被误引入会被构建拦下）。
+  注释已更新记录该事实与理由。
+
 ### 新增
 
 - **「原生输入框增强」两个开关：不用切模式就能用 deck 与高级回车**
