@@ -112,7 +112,7 @@ DSH **没有**提供「加号与权限控件之间」的插槽。`conversation.i
 ### 兼容的 DSH 版本
 
 - 已在 **DSH 0.2.1-rc.2**（内置 runtime `0.2.1-rc.2`）上验证通过；
-  `package.json` 声明 `engines.dsh: ">=0.2.1-rc.1"`。
+  `package.json` 声明 `engines.dsh: ">=0.2.0-0"`。
 - 更早的版本（如 `0.2.1-alpha.2`）功能相同，但**未在新区间逐一回归**；
   若宿主版本不满足 `engines.dsh`，DSH 会在插件页给出兼容性诊断。
 - 依赖 Node `^22.19.0 || >=24.0.0`（由 DSH 自带 runtime 提供，通常无需自装）。

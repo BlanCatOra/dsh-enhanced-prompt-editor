@@ -21,7 +21,7 @@
     `toolPresentation: both`、`azure-openai-responses` 改名、输入区 `stats` 拆分、
     `agent-instructions` 的 `dshHome`）；
   - 会话格式 v4→v4、workspace 存储 v2→v2，**数据零迁移**。
-- **`engines.dsh` 显式声明 `>=0.2.1-rc.1`**。rc.2 新增了该字段的兼容判定：
+- **`engines.dsh` 显式声明 `>=0.2.0-0`**。rc.2 新增了该字段的兼容判定：
   未声明时回退到旧的 `peerDependencies` 规则；显式声明后宿主可提前给出
   「版本不满足」的诊断，而不是加载到一半才失败。
 - **内核 seed 表扩容但白名单不跟随**：rc.2 的前端 seed 表从 9 项增至 11 项

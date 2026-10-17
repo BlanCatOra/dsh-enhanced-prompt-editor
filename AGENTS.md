@@ -51,7 +51,7 @@ md5sum lib/client.js ~/.dsh/profiles/desktop/node_modules/dsh-enhanced-prompt-ed
 |---|---|---|
 | 验证基线 | **DSH 0.2.1-rc.2**（runtime `0.2.1-rc.2`） | `python3` 读 asar 内 `/dsh/package.json` 的 version |
 | Arch 包版本 | `0.2.1rc.2-1` | `pacman -Q deepseek-harness-desktop` |
-| 声明范围 | `engines.dsh: ">=0.2.1-rc.1"` | `package.json` |
+| 声明范围 | `engines.dsh: ">=0.2.0-0"` | `package.json` |
 | Node | `^22.19.0 || >=24.0.0` | `package.json` |
 
 ⚠️ **三层版本别混**（排查时最容易错）：Arch 包版本 `0.2.1rc.2-1`、

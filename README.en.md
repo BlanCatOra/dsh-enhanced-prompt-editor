@@ -121,7 +121,7 @@ alternating stripes, and multi-line editing.
 ### Compatible DSH versions
 
 - Verified on **DSH 0.2.1-rc.2** (bundled runtime `0.2.1-rc.2`);
-  `package.json` declares `engines.dsh: ">=0.2.1-rc.1"`.
+  `package.json` declares `engines.dsh: ">=0.2.0-0"`.
 - Older versions (e.g. `0.2.1-alpha.2`) behave the same, but are not regression-tested
   across the whole range. If the host does not satisfy `engines.dsh`, DSH reports a
   compatibility diagnostic on the plugin page instead of failing halfway.
