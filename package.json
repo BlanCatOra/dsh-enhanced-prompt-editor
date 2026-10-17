@@ -5,7 +5,11 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "author": "blancatora <blancatora@agent.qq.com>",
+  "author": {
+    "name": "blancatora",
+    "email": "blancatora@agent.qq.com",
+    "url": "https://github.com/BlanCatOra"
+  },
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
