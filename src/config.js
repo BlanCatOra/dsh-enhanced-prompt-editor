@@ -138,6 +138,12 @@ export const Config = z.object({
       .default(false)
       .description('在原生模式的输入框上启用「高级回车」（复用上面那份回车策略）'),
   ),
+  shortcutEnabled: asVolatile(
+    z
+      .boolean()
+      .default(true)
+      .description('启用 Ctrl/Cmd+T 切换输入框模式的快捷键（实际值存客户端，见 native-switches.js）'),
+  ),
 });
 
 /** 剥掉一层 volatile 活引用。 */
@@ -188,5 +194,6 @@ export function resolveConfig(raw = {}) {
     extendedHeight: clampExtendedHeight(plain?.extendedHeight ?? base.extendedHeight),
     nativeDeck: typeof plain?.nativeDeck === 'boolean' ? plain.nativeDeck : base.nativeDeck,
     nativeEnter: typeof plain?.nativeEnter === 'boolean' ? plain.nativeEnter : base.nativeEnter,
+    shortcutEnabled: typeof plain?.shortcutEnabled === 'boolean' ? plain.shortcutEnabled : base.shortcutEnabled,
   };
 }

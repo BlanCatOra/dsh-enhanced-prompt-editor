@@ -236,12 +236,14 @@ function currentSwitches() {
     return {
       nativeDeck: value?.nativeDeck === true,
       nativeEnter: value?.nativeEnter === true,
+      // 缺字段按「开」：老版本存储里没有这一项，不能让升级把快捷键弄丢。
+      shortcutEnabled: value?.shortcutEnabled !== false,
       extendedEnter: value?.extendedEnter === 'newline' || value?.extendedEnter === 'inherit'
         ? value.extendedEnter
         : undefined,
     };
   } catch {
-    return { nativeDeck: false, nativeEnter: false, extendedEnter: undefined };
+    return { nativeDeck: false, nativeEnter: false, shortcutEnabled: true, extendedEnter: undefined };
   }
 }
 
@@ -589,6 +591,8 @@ export function PluginCard(props) {
   const switches = currentSwitches();
   const nativeDeckOn = switches.nativeDeck;
   const nativeEnterOn = switches.nativeEnter;
+  /** 「启用 Ctrl/Cmd+T」：同样存客户端，切换即注册/注销（见 client.js 的 sync）。 */
+  const shortcutOn = switches.shortcutEnabled;
   /** 当前回车策略（客户端存储优先，未存过回退宿主设置）。 */
   const enterPolicy = switches.extendedEnter ?? 'inherit';
   /**
@@ -650,6 +654,15 @@ export function PluginCard(props) {
             { value: 'newline', label: t?.('settings.extendedEnter.newline', { send: sendKeyLabel() }) ?? 'Enter adds a line' },
           ])
         : null,
+    ),
+    // ── 快捷键（Ctrl/Cmd+T）───────────────────────────────────────────
+    h(
+      'section',
+      { className: 'dsh-epe-card-section' },
+      h('h3', { className: 'dsh-epe-card-heading' }, t?.('settings.shortcut') ?? 'Shortcut'),
+      h('p', { className: 'dsh-epe-card-help' }, t?.('settings.shortcutHint') ?? ''),
+      // 同样「立即生效、立即保存」：切换后 client.js 会真的注册/注销内核命令。
+      immediateToggle('shortcutEnabled', shortcutOn, 'settings.shortcutEnabled', 'settings.shortcutEnabledHint'),
     ),
     // ── 扩展输入框模式 ──────────────────────────────────────────────
     modeExtendedOn

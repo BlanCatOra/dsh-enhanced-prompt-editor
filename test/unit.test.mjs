@@ -702,33 +702,45 @@ test('native-switches：默认都关、坏数据不抛、写入即持久化、�
     };
   };
 
-  // ① 没存过 / 存储不存在 → 两个都关，且绝不抛错。
-  assert.deepEqual(readStoredSwitches(undefined), { nativeDeck: false, nativeEnter: false, extendedEnter: undefined });
-  assert.deepEqual(readStoredSwitches(mkStorage()), { nativeDeck: false, nativeEnter: false, extendedEnter: undefined });
+  const OFF = { nativeDeck: false, nativeEnter: false, shortcutEnabled: true, extendedEnter: undefined };
+
+  // ① 没存过 / 存储不存在 → 两个原生增强都关、快捷键开，且绝不抛错。
+  assert.deepEqual(readStoredSwitches(undefined), OFF);
+  assert.deepEqual(readStoredSwitches(mkStorage()), OFF);
 
   // ② 坏数据（非 JSON / 非对象 / 缺字段）一律退回「关」：这是渲染前的读路径，
   //    抛一下就是白屏。
-  assert.deepEqual(readStoredSwitches(mkStorage({ [SWITCHES_STORAGE_KEY]: '{不是 json' })), {
-    nativeDeck: false,
-    nativeEnter: false,
-    extendedEnter: undefined,
-  });
-  assert.deepEqual(readStoredSwitches(mkStorage({ [SWITCHES_STORAGE_KEY]: 'null' })), {
-    nativeDeck: false,
-    nativeEnter: false,
-    extendedEnter: undefined,
-  });
-  assert.deepEqual(readStoredSwitches(mkStorage({ [SWITCHES_STORAGE_KEY]: '{"nativeDeck":"yes"}' })), {
-    nativeDeck: false,
-    nativeEnter: false,
-    extendedEnter: undefined,
-  }, '⚠️ 只认严格 true：字符串 "yes" 不能被当成都开');
+  assert.deepEqual(readStoredSwitches(mkStorage({ [SWITCHES_STORAGE_KEY]: '{不是 json' })), OFF);
+  assert.deepEqual(readStoredSwitches(mkStorage({ [SWITCHES_STORAGE_KEY]: 'null' })), OFF);
+  assert.deepEqual(readStoredSwitches(mkStorage({ [SWITCHES_STORAGE_KEY]: '{"nativeDeck":"yes"}' })), OFF
+  , '⚠️ 只认严格 true：字符串 "yes" 不能被当成都开');
+
+  // ②b 快捷键开关：**缺字段算开**（老版本存储里没有这一项，升级后不能丢）；
+  //     只有显式存过 `false` 才算关。
+  assert.equal(
+    readStoredSwitches(mkStorage({ [SWITCHES_STORAGE_KEY]: '{"nativeDeck":true}' })).shortcutEnabled,
+    true,
+    '⚠️ 老版本存储（没有 shortcutEnabled 字段）必须按默认「开」，否则升级会静默丢掉 Ctrl+T',
+  );
+  assert.equal(
+    readStoredSwitches(mkStorage({ [SWITCHES_STORAGE_KEY]: '{"shortcutEnabled":false}' })).shortcutEnabled,
+    false,
+    '显式关了就必须关',
+  );
+  assert.equal(
+    readStoredSwitches(mkStorage({ [SWITCHES_STORAGE_KEY]: '{"shortcutEnabled":"no"}' })).shortcutEnabled,
+    true,
+    '只认严格 false：字符串 "no" 不能被当成关',
+  );
 
   // ③ 写入后能读回来；只存两个布尔（不塞垃圾）。
   const storage = mkStorage();
   writeStoredSwitches(storage, { nativeDeck: true, nativeEnter: false, junk: 1 });
-  assert.deepEqual(readStoredSwitches(storage), { nativeDeck: true, nativeEnter: false, extendedEnter: undefined });
-  assert.equal(storage.raw.get(SWITCHES_STORAGE_KEY), '{"nativeDeck":true,"nativeEnter":false}');
+  assert.deepEqual(readStoredSwitches(storage), { ...OFF, nativeDeck: true });
+  assert.equal(
+    storage.raw.get(SWITCHES_STORAGE_KEY),
+    '{"nativeDeck":true,"nativeEnter":false,"shortcutEnabled":true}',
+  );
 
   // ④ 控制器：set 之后广播 + 持久化；同值不广播（避免无谓重渲染）。
   //    用一份**干净**存储建控制器（上一段的存储里已经是 open 状态了）。
@@ -738,12 +750,12 @@ test('native-switches：默认都关、坏数据不抛、写入即持久化、�
   const off = switches.subscribe((value) => seen.push(value));
   switches.set({ nativeDeck: true });
   assert.equal(seen.length, 1, '值变了要广播');
-  assert.deepEqual(readStoredSwitches(fresh), { nativeDeck: true, nativeEnter: false, extendedEnter: undefined }, 'set 必须持久化');
+  assert.deepEqual(readStoredSwitches(fresh), { ...OFF, nativeDeck: true }, 'set 必须持久化');
   switches.set({ nativeDeck: true });
   assert.equal(seen.length, 1, '值没变不广播');
   switches.set({ nativeEnter: true });
   assert.equal(seen.length, 2);
-  assert.deepEqual(switches.get(), { nativeDeck: true, nativeEnter: true, extendedEnter: undefined }, 'set 只覆盖给出的字段');
+  assert.deepEqual(switches.get(), { ...OFF, nativeDeck: true, nativeEnter: true }, 'set 只覆盖给出的字段');
   off();
   switches.set({ nativeDeck: false });
   assert.equal(seen.length, 2, '退订后不再收到');
@@ -758,6 +770,13 @@ test('native-switches：默认都关、坏数据不抛、写入即持久化、�
   const resilient = createNativeSwitches({ storage: throwing });
   assert.doesNotThrow(() => resilient.set({ nativeDeck: true }));
   assert.equal(resilient.get().nativeDeck, true, '存不下也要在本次生效');
+
+  // ⑥ 关掉快捷键也要能持久化：这是「设置里是否启用这个快捷键」的存储基础。
+  switches.set({ shortcutEnabled: false });
+  assert.equal(switches.get().shortcutEnabled, false, '关掉快捷键必须立刻生效');
+  assert.equal(readStoredSwitches(fresh).shortcutEnabled, false, '关掉快捷键必须持久化');
+  switches.set({ shortcutEnabled: true });
+  assert.equal(switches.get().shortcutEnabled, true, '再打开也要能恢复');
 });
 
 test('deckSource：扩展模式恒可见；原生模式只在客户端开关 nativeDeck 勾上时可见', () => {
@@ -1010,6 +1029,7 @@ test('defaultSettings 覆盖全部新旧字段', () => {
     'nativeDeck',
     'nativeEnter',
     'panelHeight',
+    'shortcutEnabled',
     'storage',
   ]);
   assert.equal(defaults.modeEditor, true);
@@ -1020,6 +1040,8 @@ test('defaultSettings 覆盖全部新旧字段', () => {
   // 原生模式的两个增强默认**关**：不勾选时原生输入框保持原样。
   assert.equal(defaults.nativeDeck, false);
   assert.equal(defaults.nativeEnter, false);
+  // 快捷键默认**开**：用户没主动关就照旧生效。
+  assert.equal(defaults.shortcutEnabled, true);
 });
 
 /* ── 扩展输入框：DOM 探测与 Lexical 接入 ───────────────────────────── */

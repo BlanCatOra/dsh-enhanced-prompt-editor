@@ -136,9 +136,30 @@ md5sum lib/client.js ~/.dsh/profiles/desktop/node_modules/dsh-enhanced-prompt-ed
   message 吞成 `false`，用户只看到一句泛泛的「宿主拒绝」。
 - **空写探针**（把 `panelHeight` 写成它当前值）同样被拒 → 与具体字段无关。
 
-因此「原生输入框增强」两个开关 + 回车策略改存 **客户端 localStorage**
+因此「原生输入框增强」两个开关 + 回车策略 + **快捷键开关**改存 **客户端 localStorage**
 （`src/native-switches.js`），切换即时生效、不点保存。
-宿主 schema 里仍保留这两个字段作为保留位（将来修好可搬回）。
+宿主 schema 里仍保留这些字段作为保留位（将来修好可搬回）。
+
+### 5.1b 内核 `browser.new` 也占 `Ctrl+T`，注册会整条被拒
+
+实测（localStorage leveldb 里 2026-10-18 的启动报告）：
+
+```
+where:   shortcut:cycle-mode
+message: Conflicting shortcut defaults: dsh-enhanced-prompt-editor.cycle-mode
+         and browser.new (desktop:macos)
+```
+
+- 内核 `@deepseek-ai/dsh-client-ui-sidebar-browser` 注册的 `browser.new`
+  （侧栏浏览器「新建标签页」）在 `desktop:macos|windows|linux` 默认就是
+  `primary + KeyT`；web 端是 `primary+alt+KeyT`。
+- `ShortcutRegistry.register()` 逐组校验，发现键位重叠就抛错，**整条命令注册失败**
+  —— 不是「两个都触发」，是「本插件那条根本没进去」。
+- **插件无法解决**：内核命令不可改、也没有「后注册者覆盖」的语义。可行出路只有两条：
+  ① 用户在「设置 → 快捷键」里给本命令改键（前提是命令已注册成功）；
+  ② 关掉插件页面里的「启用 `Ctrl/Cmd+T` 快捷键」。
+- ⚠️ 注册失败**必须**记进启动报告（`guardStep(failures, 'shortcut:cycle-mode:register', ...)`），
+  否则用户只会看到「按了没反应」而无法归因。这条是本仓库反复踩的「静默失效」模式。
 
 ### 5.2 DSH 的崩溃对话框不可信，「Web authentication failed」是兜底文案
 
@@ -272,7 +293,7 @@ src/
   client.js           客户端入口：apply() 装配所有表面
   plugin-card.js      插件详情页的设置卡片（primitives 拼装）
   settings-face.js    设置面（volatile 折叠 + 默认值收敛）
-  native-switches.js  「原生输入框增强」开关的客户端存储
+  native-switches.js  客户端开关存储（原生 deck / 原生高级回车 / Ctrl+T 快捷键开关）
   mode-controller.js  native / editor / extended 三态 + 插槽 hooks 快照源
   native-composer.js  扩展输入框与「原生高级回车」的 DOM 控制器
   extended-bar.js     deck（符号/缩进工具条）+ 行号沟槽

@@ -174,6 +174,9 @@ keeps only the read-only plugin list"). Changes are written **only when you pres
 | Panel height | 420px | 180–1400 |
 | Allow opening in the built-in viewer | On | When off, no workspace file is written |
 | Show the dictate button | On | Requires the speech-to-text plugin |
+| Show the floating deck on the native composer | Off | Adds the symbol/indent deck to Native mode too |
+| Enable advanced Enter on the native composer | Off | Native mode also honours the Enter policy |
+| Enable the `Ctrl/Cmd+T` shortcut | On | When off the key is not captured at all (the T button still works) |
 
 > ⚠️ **DSH has no "does Enter send or add a line" setting of its own.** Its Enter row only
 > picks queue vs. steer while the agent is **busy**; a bare Enter always sends. So "Enter in
@@ -193,7 +196,17 @@ keeps only the read-only plugin list"). Changes are written **only when you pres
 `Ctrl/Cmd + T` goes through DSH's official shortcut service (`ctx.shortcuts`), so it shows up
 in **Settings → Shortcuts** and can be remapped; a conflicting binding is rejected at
 registration instead of double-firing; and it only fires in the page / composer / terminal
-regions, never inside a settings modal.
+regions, never inside a settings modal. You can also turn the key off entirely with
+**Enable the `Ctrl/Cmd+T` shortcut** on the plugin page.
+
+> ⚠️ **Known key conflict: DSH's built-in “new browser tab” command also uses `Ctrl/Cmd + T`.**
+> The kernel rejects the whole registration when two commands share a key, so only one of them
+> can hold it. If `Ctrl/Cmd+T` opens the sidebar browser, do either of these:
+>
+> 1. Open **Settings → Shortcuts** and remap this plugin's command to another key;
+> 2. Or turn off **Enable the `Ctrl/Cmd+T` shortcut** and use the T button in the composer.
+>
+> The key belongs to the DSH kernel; a plugin cannot take it over unilaterally.
 
 Enter during IME composition is **never intercepted** — that belongs to the candidate list, so it goes back to the browser.
 

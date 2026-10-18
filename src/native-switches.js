@@ -1,5 +1,5 @@
 /**
- * 「原生输入框增强」两个开关的**客户端**存储。
+ * 「客户端开关」存储：原生输入框增强的两个开关 + Ctrl/Cmd+T 快捷键开关。
  *
  * ## 为什么存客户端而不是宿主设置
  *
@@ -17,27 +17,41 @@
  * 宿主 schema 里的 `nativeDeck` / `nativeEnter` 字段仍然保留（保留位），
  * 将来宿主写入修好后可以再搬回去，客户端读法不用变。
  *
+ * 第三个开关 `shortcutEnabled`（用户 2026-10-18 要求「设置里要有是否启用
+ * 这个快捷键」）同理存客户端：它只决定**浏览器侧要不要注册** `Ctrl/Cmd+T`
+ * 命令，宿主完全不消费，走宿主设置反而会被那条被拒的写入通道卡死。
+ *
  * @module dsh-enhanced-prompt-editor/native-switches
  */
 
 /** 存储键。改它等于让所有用户的选择回到默认值。 */
 export const SWITCHES_STORAGE_KEY = 'dsh-enhanced-prompt-editor:native-switches';
 
-/** 三个客户端值的默认值：两个开关都关；回车策略 `undefined` = 跟随宿主设置。 */
+/**
+ * 客户端值的默认值。
+ *
+ *  - 原生增强两个开关默认**关**（原生模式保持原生外观与回车语义）；
+ *  - `shortcutEnabled` 默认**开**（Ctrl/Cmd+T 是本次新增的既有能力，
+ *    用户没关它就照旧生效）；
+ *  - 回车策略 `undefined` = 跟随宿主设置。
+ */
 export function defaultSwitches() {
-  return { nativeDeck: false, nativeEnter: false, extendedEnter: undefined };
+  return { nativeDeck: false, nativeEnter: false, shortcutEnabled: true, extendedEnter: undefined };
 }
 
 /**
  * 把任意值收敛成两个布尔。
  *
  * @param value 可能是存储里读出来的 JSON、也可能是设置面给的值。
- * @returns `{ nativeDeck, nativeEnter }`，非 `true` 一律算关。
+ * @returns `{ nativeDeck, nativeEnter, shortcutEnabled, extendedEnter }`。
  */
 function normalizeSwitches(value) {
   return {
     nativeDeck: value?.nativeDeck === true,
     nativeEnter: value?.nativeEnter === true,
+    // 只有显式存过 `false` 才算关：缺字段、坏数据、老版本存储都按默认「开」，
+    // 否则升级后用户的 Ctrl+T 会莫名消失。
+    shortcutEnabled: value?.shortcutEnabled !== false,
     // 回车策略：只有显式存过才生效，未存过时保持 undefined（由调用方回退到宿主值）。
     extendedEnter: value?.extendedEnter === 'newline' || value?.extendedEnter === 'inherit'
       ? value.extendedEnter
@@ -48,11 +62,11 @@ function normalizeSwitches(value) {
 /**
  * 从 localStorage 兼容对象读取开关。
  *
- * 存储不可用、内容损坏、字段缺失 —— 一律退回默认值（两个关），
+ * 存储不可用、内容损坏、字段缺失 —— 一律退回默认值，
  * **绝不抛错**：这是渲染前的读路径，抛一下就是白屏。
  *
  * @param storage `localStorage` 兼容对象（可能不存在）。
- * @returns `{ nativeDeck, nativeEnter }`
+ * @returns `{ nativeDeck, nativeEnter, shortcutEnabled, extendedEnter }`
  */
 export function readStoredSwitches(storage) {
   const fallback = defaultSwitches();
@@ -72,7 +86,7 @@ export function readStoredSwitches(storage) {
  * 只是重启后回到默认值。
  *
  * @param storage `localStorage` 兼容对象。
- * @param value 两个开关的当前值。
+ * @param value 开关的当前值。
  */
 export function writeStoredSwitches(storage, value) {
   try {
@@ -112,6 +126,7 @@ export function createNativeSwitches(options) {
   const view = () => ({
     nativeDeck: current.nativeDeck,
     nativeEnter: current.nativeEnter,
+    shortcutEnabled: current.shortcutEnabled,
     extendedEnter: current.extendedEnter ?? (typeof policyFallback === 'function' ? policyFallback() : policyFallback),
   });
 
@@ -129,6 +144,7 @@ export function createNativeSwitches(options) {
       if (
         merged.nativeDeck === current.nativeDeck
         && merged.nativeEnter === current.nativeEnter
+        && merged.shortcutEnabled === current.shortcutEnabled
         && merged.extendedEnter === current.extendedEnter
       ) return;
       current = merged;

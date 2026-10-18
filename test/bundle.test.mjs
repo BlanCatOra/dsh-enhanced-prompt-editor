@@ -1813,6 +1813,65 @@ test('Ctrl+T 注册为官方快捷键命令：等价于点 T 控件，且在输�
   assert.notEqual(face.useMode((v) => v), 'native', '⚠️ 触发快捷键后模式必须切换（等价于点 T 控件）');
 });
 
+test('快捷键开关：关掉后真的注销内核命令，重新打开再注册（设置项的运行时语义）', async () => {
+  // 用户 2026-10-18：「设置没有是否启动这个快捷键 需要这个设置项」。
+  // 只加一个 UI 勾选是不够的 —— 关掉必须真的把命令从内核快捷键表里摘掉，
+  // 否则「关了还生效」比没有开关更糟。
+  const react = makeReact();
+  const exports = await loadBundle(react);
+  const ctx = makeCtx();
+  const store = memoryStorage();
+  // 默认开：apply 时就该注册上一条。
+  withStorage('localStorage', store, () => {
+    withStorage('sessionStorage', undefined, () => {
+      exports.apply(ctx);
+    });
+  });
+
+  const cycleCommands = () =>
+    (ctx.__shortcutCommands ?? []).filter((item) => item.id === 'dsh-enhanced-prompt-editor.cycle-mode');
+
+  assert.equal(cycleCommands().length, 1, '默认（开关为开）必须注册且只注册一条');
+
+  // 从插件卡片里拿到「启用快捷键」开关并关掉它。
+  const entry = ctx.__registrations.find((item) => item.options.name === 'plugins.bundle.config');
+  const t = ctx.locale.bind('dsh-enhanced-prompt-editor');
+  const scope = {
+    getSnapshot: () => ({
+      status: 'ready',
+      writable: true,
+      revision: 1,
+      value: { modeEditor: true, modeExtended: true },
+      base: {},
+      user: {},
+    }),
+    subscribe: () => () => undefined,
+    mutate: async () => true,
+  };
+  react.__reset();
+  entry.component({ t, view: 'page', scope });
+  const shortcutSwitch = react.__created.find(
+    (node) => node?.type?.primitiveName === 'Switch' && node.props.label === t('settings.shortcutEnabled'),
+  );
+  assert.ok(shortcutSwitch !== undefined, '⚠️ 设置卡片里必须有「启用 Ctrl/Cmd+T 快捷键」这个开关');
+
+  shortcutSwitch.props.onChange(false);
+  assert.equal(cycleCommands().length, 0, '⚠️ 关掉开关后必须真的注销内核命令（否则「关了还生效」）');
+
+  // 再打开：必须重新注册回来。
+  react.__reset();
+  entry.component({ t, view: 'page', scope });
+  const again = react.__created.find(
+    (node) => node?.type?.primitiveName === 'Switch' && node.props.label === t('settings.shortcutEnabled'),
+  );
+  again.props.onChange(true);
+  assert.equal(cycleCommands().length, 1, '重新打开后必须重新注册');
+
+  // 开关状态要持久化到客户端存储，重启后仍然有效。
+  const stored = JSON.parse(store.getItem('dsh-enhanced-prompt-editor:native-switches') ?? '{}');
+  assert.equal(stored.shortcutEnabled, true, '开关必须持久化（否则重启就丢）');
+});
+
 test('导出 inject 必须覆盖源码里用到的每一个 ctx 服务（漏写会打挂整个 DSH 启动）', async () => {
   const { readFile: rf, readdir } = await import('node:fs/promises');
   const exports = await loadBundle(makeReact());

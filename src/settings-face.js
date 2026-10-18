@@ -50,6 +50,7 @@ function normalize(value, fallback) {
     // test/unit.test.mjs 有一条不变量测试专门守这里。
     nativeDeck: typeof value.nativeDeck === 'boolean' ? value.nativeDeck : base.nativeDeck,
     nativeEnter: typeof value.nativeEnter === 'boolean' ? value.nativeEnter : base.nativeEnter,
+    shortcutEnabled: typeof value.shortcutEnabled === 'boolean' ? value.shortcutEnabled : base.shortcutEnabled,
   };
 }
 

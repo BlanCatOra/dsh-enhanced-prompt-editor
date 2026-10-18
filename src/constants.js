@@ -325,6 +325,14 @@ export function defaultSettings(config) {
      * 回车换行、发送键发送）。默认 **false**：原生模式保持 DSH 原生回车语义。
      */
     nativeEnter: source.nativeEnter === true,
+    /**
+     * 是否启用 `Ctrl/Cmd+T` 切换输入框模式的快捷键。
+     *
+     * 实际生效值存在**客户端**（见 `native-switches.js`）：这里保留字段是为了
+     * 三处手写清单一致（`defaultSettings` / `resolveConfig` / 设置面 normalize），
+     * 并让 profile patch 里能预先声明默认值。默认 **true**：用户没关就照旧生效。
+     */
+    shortcutEnabled: source.shortcutEnabled !== false,
   };
 }
 

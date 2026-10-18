@@ -138,6 +138,15 @@ function applySources(ctx, failures) {
       return ctx.locale.bind(PLUGIN_ID);
     }) ?? localT;
 
+  /**
+   * 客户端开关控制器（原生 deck / 原生高级回车 / **快捷键开关**）。
+   *
+   * 提到 `state` 块外面：快捷键的注册块在 state 之后，但它要不要注册必须
+   * 跟着这个开关走（用户 2026-10-18 要求「设置里要有是否启用这个快捷键」），
+   * 而且要在开关变化时**运行时**注册/注销，不能只在 apply 时读一次。
+   */
+  let switches = null;
+
   /* ── 0. 共享状态（三面共用，建不起来就没有后续） ─────────────────── */
   const shared = guardStep(failures, 'state', () => {
     const store = createDraftStore();
@@ -157,6 +166,7 @@ function applySources(ctx, failures) {
       policyFallback: () => settings.get()?.extendedEnter,
     });
     guardStep(failures, 'native-switches:card', () => setNativeSwitches(nativeSwitches));
+    switches = nativeSwitches;
 
     const modes = createModeController({
       settings,
@@ -362,31 +372,105 @@ function applySources(ctx, failures) {
   // ⚠️ 用 `primary` 而不是 `control`：primary 在 macOS 上映射 meta(Cmd)、
   //    其余平台映射 control —— 与内核既有命令（Ctrl/Cmd+/ 打开快捷键表）一致。
   guardStep(failures, 'shortcut:cycle-mode', () => {
-    ctx.effect(
-      () =>
-        ctx.shortcuts.register({
-          id: 'dsh-enhanced-prompt-editor.cycle-mode',
-          label: () => t('trigger.label'),
-          aliases: ['enhanced prompt editor', 'cycle mode', '切换输入框模式'],
-          // ⚠️ **只能声明 desktop:*，绝对不能带 web:***。
-          // 内核 `isWebBindingAllowed()` 对 web 端只放行三种组合
-          // （primary+Slash / primary+Shift+Comma / primary+Shift+Period），
-          // 单修饰键 + KeyT 会被判 unsupported-browser；而 register() 是
-          // **逐组校验、任一组失败则整条命令注册失败**。
-          // 实测踩过：带上 web:* 后整条命令被拒（启动报告里是
-          // `Unsupported Web shortcut: ...cycle-mode`），Ctrl+T 于是落到
-          // 内核「打开侧栏浏览器」的绑定上 —— 看起来像被内核占了，其实是自己没注册上。
-          defaults: {
-            'desktop:macos': { code: 'KeyT', modifiers: ['primary'] },
-            'desktop:windows': { code: 'KeyT', modifiers: ['primary'] },
-            'desktop:linux': { code: 'KeyT', modifiers: ['primary'] },
-          },
-          // 三个 region 全要：输入框（editable）/ 页面（page）/ 终端（terminal）
-          regions: ['page', 'editable', 'terminal'],
-          resolve: () => ({ status: 'handled', run: () => void shared.modes.cycle() }),
-        }),
-      `${PLUGIN_ID}: shortcut cycle-mode`,
-    );
+    /**
+     * 注册本项目自己的命令。
+     *
+     * 提成函数是因为它要在**运行时按开关**反复注册/注销（见下面的 `sync`）：
+     * 「设置里是否启用这个快捷键」是用户 2026-10-18 的要求，关掉之后必须
+     * 真的把命令从快捷键表里摘掉，而不是留一条注册成功但空转的命令。
+     */
+    const registerCommand = () =>
+      ctx.shortcuts.register({
+        id: 'dsh-enhanced-prompt-editor.cycle-mode',
+        label: () => t('trigger.label'),
+        aliases: ['enhanced prompt editor', 'cycle mode', '切换输入框模式'],
+        // ⚠️ **只能声明 desktop:*，绝对不能带 web:***。
+        // 内核 `isWebBindingAllowed()` 对 web 端只放行三种组合
+        // （primary+Slash / primary+Shift+Comma / primary+Shift+Period），
+        // 单修饰键 + KeyT 会被判 unsupported-browser；而 register() 是
+        // **逐组校验、任一组失败则整条命令注册失败**。
+        // 实测踩过：带上 web:* 后整条命令被拒（启动报告里是
+        // `Unsupported Web shortcut: ...cycle-mode`），Ctrl+T 于是落到
+        // 内核「打开侧栏浏览器」的绑定上 —— 看起来像被内核占了，其实是自己没注册上。
+        //
+        // ⚠️⚠️ 另一个**真实冲突**：内核自带的 `browser.new`（侧栏浏览器
+        // 「新建标签页」）在 desktop 三平台默认也是 `primary + KeyT`。
+        // `ShortcutRegistry.register()` 一旦发现键位重叠就抛
+        // `Conflicting shortcut defaults: <本命令> and browser.new`，整条命令
+        // 注册失败（启动报告里能看到，localStorage leveldb 里也留过记录）。
+        // 这不是本插件能单方面解决的（内核命令不可改），所以：
+        //   ① 失败会在启动报告里显形，不再静默；
+        //   ② 用户在「设置 → 快捷键」里改键即可（命令注册成功后就能改）；
+        //   ③ 真被拒时用户还可以用 T 按钮，功能不丢；
+        //   ④ 设置卡片里有「启用」开关，冲突时可以直接关掉。
+        defaults: {
+          'desktop:macos': { code: 'KeyT', modifiers: ['primary'] },
+          'desktop:windows': { code: 'KeyT', modifiers: ['primary'] },
+          'desktop:linux': { code: 'KeyT', modifiers: ['primary'] },
+        },
+        // 三个 region 全要：输入框（editable）/ 页面（page）/ 终端（terminal）
+        regions: ['page', 'editable', 'terminal'],
+        resolve: () => ({ status: 'handled', run: () => void shared.modes.cycle() }),
+      });
+
+    /** 已注册命令的注销函数；`null` = 当前没注册。 */
+    let dispose = null;
+
+    /** 开关的当前值：控制器缺席（state 建失败）时按「开」处理。 */
+    const enabledNow = () => {
+      try {
+        return switches?.get?.()?.shortcutEnabled !== false;
+      } catch {
+        return true;
+      }
+    };
+
+    /**
+     * 按开关同步注册状态。幂等：重复调用不会重复注册。
+     *
+     * 注册失败**必须**被记进启动报告（`guardStep`）：那是用户唯一能看到的
+     * 「快捷键为什么没生效」的证据，不能吞。
+     */
+    const sync = () => {
+      const enabled = enabledNow();
+      if (enabled && dispose === null) {
+        guardStep(failures, 'shortcut:cycle-mode:register', () => {
+          dispose = registerCommand();
+        });
+        return;
+      }
+      if (!enabled && dispose !== null) {
+        const off = dispose;
+        dispose = null;
+        try {
+          off();
+        } catch (error) {
+          guardStep(failures, 'shortcut:cycle-mode:unregister', () => {
+            throw error;
+          });
+        }
+      }
+    };
+
+    ctx.effect(() => {
+      sync();
+      // 开关变化即时生效（卡片上的勾选是「立即生效、立即保存」的）。
+      const offSwitches = switches?.subscribe?.(() => {
+        guardStep(failures, 'shortcut:cycle-mode:sync', sync);
+      });
+      return () => {
+        offSwitches?.();
+        if (dispose !== null) {
+          const off = dispose;
+          dispose = null;
+          try {
+            off();
+          } catch {
+            // 卸载期注销失败不影响后续清理。
+          }
+        }
+      };
+    }, `${PLUGIN_ID}: shortcut cycle-mode`);
   });
 
   /* ── 1. 输入框工具行的 T 按钮 ─────────────────────────────────────── */
