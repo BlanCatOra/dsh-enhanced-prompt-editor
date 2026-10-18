@@ -28,10 +28,11 @@
 - **回车策略**：`inherit`（跟随 DSH 设置）或 `newline`（回车换行、发送键发送）。
 - **草稿落盘**：`storage` 可选 `workspace`（写工作区 `.md`）/ `browser` / `none`；
   通过 Host 侧同源路由 `/plugins/dsh-enhanced-prompt-editor/draft` 读写。
-- **`Ctrl/Cmd + T`**：切换输入框模式，等价于点 T 按钮（走官方 `ctx.shortcuts`，
-  可在「设置 → 快捷键」里改键；插件页面有「启用 `Ctrl/Cmd+T` 快捷键」开关可整个关掉）。
-  ⚠️ 该键与 DSH 内置的「新建浏览器标签页」默认**同键**，内核遇冲突会整条拒绝注册 ——
-  遇到时改键或关掉本项。
+- **`Ctrl/Cmd + Shift + T`**：切换输入框模式，等价于点 T 按钮（走官方 `ctx.shortcuts`，
+  可在「设置 → 快捷键」里改键；插件页面有「启用 `Ctrl/Cmd+Shift+T` 快捷键」开关可整个关掉）。
+  刻意**避开** `Ctrl/Cmd+T` —— 那是 DSH 内核「新建浏览器标签页」（`browser.new`）的键位；
+  内核遇同键冲突会整条拒绝注册，占用它等于抢走宿主既有能力，故本插件主动避让。
+  ⚠️ `Shift+T`（纯 Shift）不可用：内核 `bindingIssue()` 判 `modifier-required`（在 desktop:linux 组生效）。
 - **Esc 退出**：模式一/二下按 Esc 回到原生模式，T 按钮角标同步。
 - **设置位置**：注册在插件详情页（`plugins.bundle.config`），不在「设置」页。
 

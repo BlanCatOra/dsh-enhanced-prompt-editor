@@ -1751,7 +1751,7 @@ function stripCommentsAndStrings(code) {
 }
 
 
-test('Ctrl+T 注册为官方快捷键命令：等价于点 T 控件，且在输入框里生效', async () => {
+test('Ctrl/Cmd+Shift+T 注册为官方快捷键命令：等价于点 T 控件，且在输入框里生效', async () => {
   // 用户 2026-10-18 要求「注册一个 dsh 内快捷键 ctrl+t，效果等同点了 t 控件」。
   //
   // 为什么必须走 `ctx.shortcuts` 而不是自己监听 keydown：
@@ -1772,38 +1772,67 @@ test('Ctrl+T 注册为官方快捷键命令：等价于点 T 控件，且在输�
   const command = commands.find((item) => item.id === 'dsh-enhanced-prompt-editor.cycle-mode');
   assert.ok(command !== undefined, '必须注册 id 为 dsh-enhanced-prompt-editor.cycle-mode 的快捷键命令');
 
-  // ① 键位：Ctrl+T（跨平台用 primary：macOS 映射 Cmd，其余映射 Ctrl）
+  // ① 键位：Ctrl/Cmd + Shift + T（用户 2026-10-18 要求**避让**内核的 Ctrl+T）。
+  //    跨平台用 primary：macOS 映射 Cmd，其余映射 Ctrl。
   for (const platform of ['macos', 'windows', 'linux']) {
     const binding = command.defaults?.[`desktop:${platform}`];
     assert.ok(binding !== undefined, `缺少 desktop:${platform} 的默认键位`);
     assert.equal(binding.code, 'KeyT', `desktop:${platform} 的物理键必须是 KeyT`);
-    assert.deepEqual(binding.modifiers, ['primary'], '修饰键必须是 primary（Ctrl/Cmd）');
+    assert.deepEqual(
+      binding.modifiers,
+      ['primary', 'shift'],
+      '⚠️ 必须是 primary+shift：单 primary 会抢内核 browser.new（Ctrl+T）的键位',
+    );
+  }
+
+  // ①a ⚠️ **不得再用单 primary+KeyT**（真实冲突，已实测）。
+  //    内核 browser.new（侧栏浏览器「新建标签页」）在 desktop 三平台默认就是
+  //    primary+KeyT；两条命令键位重叠时 register() 抛 Conflict、整条注册失败。
+  //    用户明确要求避让：Ctrl+T 归内核，本插件用 Ctrl+Shift+T。
+  for (const platform of ['macos', 'windows', 'linux']) {
+    assert.notDeepEqual(
+      command.defaults?.[`desktop:${platform}`]?.modifiers,
+      ['primary'],
+      `⚠️ desktop:${platform} 不能用单 primary+KeyT：那是内核 browser.new 的键位`,
+    );
   }
 
   // ①b ⚠️ **绝不能声明 web:* 键位**（真实故障，已踩）：
   // 内核 isWebBindingAllowed() 对 web 端只放行 primary+Slash / primary+Shift+Comma /
-  // primary+Shift+Period 三种；单修饰键 + KeyT 判 unsupported-browser。而 register()
-  // 是**逐组校验、任一组失败则整条命令注册失败** —— 带上 web:* 后整条命令被拒，
-  // Ctrl+T 落到内核「打开侧栏浏览器」的绑定上（看起来像被内核占了，其实是自己没注册上）。
+  // primary+Shift+Period 三种；primary+Shift+KeyT 同样判 unsupported-browser。而
+  // register() 是**逐组校验、任一组失败则整条命令注册失败** —— 带上 web:* 后整条被拒。
   for (const platform of ['macos', 'windows', 'linux']) {
     assert.equal(
       command.defaults?.[`web:${platform}`],
       undefined,
-      `⚠️ 不得声明 web:${platform}：web 端不允许单修饰键+KeyT，会让整条命令注册失败`,
+      `⚠️ 不得声明 web:${platform}：web 端不允许该组合，会让整条命令注册失败`,
+    );
+  }
+
+  // ①c ⚠️ 单 Shift + KeyT 是**不可用**的，别再改回它：
+  //    内核 bindingIssue() 显式拒绝「只有 shift」的修饰组合
+  //    （`modifiers.every(m => m === 'shift')` → modifier-required）。
+  //    desktop:macos/windows 会在函数开头提前放行，但 **desktop:linux 会落到拒绝分支**，
+  //    而 register() 任一组失败即整条失败 —— Linux 上等于压根没注册。
+  for (const platform of ['macos', 'windows', 'linux']) {
+    const mods = command.defaults?.[`desktop:${platform}`]?.modifiers ?? [];
+    assert.ok(
+      !(mods.length === 1 && mods[0] === 'shift'),
+      `⚠️ desktop:${platform} 不能用纯 Shift+KeyT：内核判 modifier-required（Linux 上整条注册失败）`,
     );
   }
 
   // ② ⚠️ region 必须包含 editable：用户就是在输入框里按的。
-  //    缺了它，在 composer 里按 Ctrl+T 会被判「不匹配」而静默不生效（本仓库踩过同类坑）。
+  //    缺了它，在 composer 里按快捷键会被判「不匹配」而静默不生效（本仓库踩过同类坑）。
   assert.ok(Array.isArray(command.regions), '必须声明 regions');
   for (const region of ['page', 'editable', 'terminal']) {
     assert.ok(command.regions.includes(region), `regions 必须包含 ${region}（否则该区域按了没反应）`);
   }
-  assert.ok(command.regions.includes('editable'), '⚠️ 缺 editable 会让输入框里的 Ctrl+T 静默失效');
+  assert.ok(command.regions.includes('editable'), '⚠️ 缺 editable 会让输入框里的快捷键静默失效');
 
   // ③ 触发时必须真的切模式（等价于点 T 控件），而不是弹面板或什么都不做
   const resolved = command.resolve({ region: 'editable', modal: null });
-  assert.equal(resolved?.status, 'handled', '在输入框里按 Ctrl+T 必须被当作已处理');
+  assert.equal(resolved?.status, 'handled', '在输入框里按快捷键必须被当作已处理');
   assert.equal(typeof resolved?.run, 'function', 'handled 必须带 run 回调');
 
   const trigger = ctx.__registrations.find((entry) => entry.options.name === 'conversation.input.left');

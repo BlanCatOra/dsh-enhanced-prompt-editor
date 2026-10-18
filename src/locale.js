@@ -135,11 +135,11 @@ export function createLocale() {
         '让「原生」模式也用下面的回车策略（例如回车换行、发送键发送）。回车策略与扩展模式共用同一个设置。',
       'settings.shortcut': '快捷键',
       'settings.shortcutHint':
-        '启用 Ctrl/Cmd+T 切换输入框模式（等价于点输入框左侧的 T 按钮）。关掉后不影响 T 按钮本身。',
-      'settings.shortcutEnabled': '启用 Ctrl/Cmd+T 快捷键',
+        '启用 Ctrl/Cmd+Shift+T 切换输入框模式（等价于点输入框左侧的 T 按钮）。关掉后不影响 T 按钮本身。',
+      'settings.shortcutEnabled': '启用 Ctrl/Cmd+Shift+T 快捷键',
       'settings.shortcutEnabledHint':
         '走 DSH 官方快捷键服务，可在「设置 → 快捷键」里改键。'
-        + '若该键已被 DSH 内置命令（如「新建浏览器标签页」）占用，注册会被拒绝，此时请改键或关掉本项。',
+        + '默认刻意避开 Ctrl/Cmd+T —— 那是 DSH「新建浏览器标签页」的键位。',
       'settings.hostStale':
         '当前运行中的宿主还不认识这两个字段（只重载了插件前端，宿主侧没有）。勾选后保存会被宿主拒绝 —— '
         + '请完全退出并重新启动 DSH 再试。',
@@ -273,11 +273,11 @@ export function createLocale() {
         'Lets Native mode use the Enter behavior below too (e.g. Enter adds a line, the send key sends). Tall-composer mode shares the same setting.',
       'settings.shortcut': 'Shortcut',
       'settings.shortcutHint':
-        'Enables Ctrl/Cmd+T to cycle the composer mode (same as clicking the T button). Turning it off does not affect the T button itself.',
-      'settings.shortcutEnabled': 'Enable the Ctrl/Cmd+T shortcut',
+        'Enables Ctrl/Cmd+Shift+T to cycle the composer mode (same as clicking the T button). Turning it off does not affect the T button itself.',
+      'settings.shortcutEnabled': 'Enable the Ctrl/Cmd+Shift+T shortcut',
       'settings.shortcutEnabledHint':
         'Goes through DSH’s official shortcut service, so it can be remapped in Settings → Shortcuts. '
-        + 'If DSH already uses the key (e.g. “new browser tab”), registration is rejected — remap it or turn this off.',
+        + 'It deliberately avoids Ctrl/Cmd+T, which DSH uses for “new browser tab”.',
       'settings.hostStale':
         'The running Host does not know these two fields yet (only the client bundle reloaded). '
         + 'Saving them will be rejected by the Host — fully quit and restart DSH, then try again.',

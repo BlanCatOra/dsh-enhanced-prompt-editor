@@ -176,7 +176,7 @@ keeps only the read-only plugin list"). Changes are written **only when you pres
 | Show the dictate button | On | Requires the speech-to-text plugin |
 | Show the floating deck on the native composer | Off | Adds the symbol/indent deck to Native mode too |
 | Enable advanced Enter on the native composer | Off | Native mode also honours the Enter policy |
-| Enable the `Ctrl/Cmd+T` shortcut | On | When off the key is not captured at all (the T button still works) |
+| Enable the `Ctrl/Cmd+Shift+T` shortcut | On | When off the key is not captured at all (the T button still works) |
 
 > ⚠️ **DSH has no "does Enter send or add a line" setting of its own.** Its Enter row only
 > picks queue vs. steer while the agent is **busy**; a bare Enter always sends. So "Enter in
@@ -188,25 +188,29 @@ keeps only the read-only plugin list"). Changes are written **only when you pres
 
 | Key | Action |
 |---|---|
-| `Ctrl/Cmd + T` | **Cycle the composer mode** (same as clicking the T button; works while typing) |
+| `Ctrl/Cmd + Shift + T` | **Cycle the composer mode** (same as clicking the T button; works while typing) |
 | `Enter` | Adds a line (default), or sends if you invert the setting |
 | `Cmd/Ctrl + Enter` | Sends (default), or adds a line |
 | `Shift + Enter` | Always adds a line |
 
-`Ctrl/Cmd + T` goes through DSH's official shortcut service (`ctx.shortcuts`), so it shows up
-in **Settings → Shortcuts** and can be remapped; a conflicting binding is rejected at
+`Ctrl/Cmd + Shift + T` goes through DSH's official shortcut service (`ctx.shortcuts`), so it
+shows up in **Settings → Shortcuts** and can be remapped; a conflicting binding is rejected at
 registration instead of double-firing; and it only fires in the page / composer / terminal
 regions, never inside a settings modal. You can also turn the key off entirely with
-**Enable the `Ctrl/Cmd+T` shortcut** on the plugin page.
+**Enable the `Ctrl/Cmd+Shift+T` shortcut** on the plugin page.
 
-> ⚠️ **Known key conflict: DSH's built-in “new browser tab” command also uses `Ctrl/Cmd + T`.**
-> The kernel rejects the whole registration when two commands share a key, so only one of them
-> can hold it. If `Ctrl/Cmd+T` opens the sidebar browser, do either of these:
+> 💡 **Why not `Ctrl/Cmd + T`? That key belongs to DSH.** The kernel's “new browser tab”
+> command (`browser.new`) is bound to `Ctrl/Cmd + T` by default, and kernel registration
+> rejects the whole command when two share a key. This plugin used to take that key, which
+> made the *kernel* command fail to register instead — i.e. it stole a host capability.
+> So the plugin now **yields** and uses `Ctrl/Cmd + Shift + T`.
 >
-> 1. Open **Settings → Shortcuts** and remap this plugin's command to another key;
-> 2. Or turn off **Enable the `Ctrl/Cmd+T` shortcut** and use the T button in the composer.
+> Note that plain `Shift + T` does not work either: the kernel's `bindingIssue()` rejects
+> shift-only modifier combinations, and that rejection applies to the `desktop:linux` group.
+> Registration validates every group and fails the entire command on any single failure, so on
+> Linux it would simply never register.
 >
-> The key belongs to the DSH kernel; a plugin cannot take it over unilaterally.
+> To change it: open **Settings → Shortcuts** and remap this plugin's command.
 
 Enter during IME composition is **never intercepted** — that belongs to the candidate list, so it goes back to the browser.
 

@@ -360,7 +360,7 @@ function applySources(ctx, failures) {
     );
   });
 
-  /* ── 0. 快捷键 Ctrl+T：等价于点 T 控件 ──────────────────────────── */
+  /* ── 0. 快捷键 Ctrl/Cmd+Shift+T：等价于点 T 控件 ────────────────── */
   //
   // 用内核的 shortcuts 服务注册（**不要自己抢 keydown**）：它自带
   //   - 冲突检测（与内核/其它插件同键会拒绝注册，而不是两方都触发）；
@@ -368,9 +368,34 @@ function applySources(ctx, failures) {
   //   - 「快捷键」设置页里可见、且用户可改键。
   //
   // ⚠️ region 必须包含 `editable`：用户就是在输入框里按的。缺了它，
-  //    在 composer 里按 Ctrl+T 会被判成「不匹配」直接放过（静默不生效）。
-  // ⚠️ 用 `primary` 而不是 `control`：primary 在 macOS 上映射 meta(Cmd)、
-  //    其余平台映射 control —— 与内核既有命令（Ctrl/Cmd+/ 打开快捷键表）一致。
+  //    在 composer 里按快捷键会被判成「不匹配」直接放过（静默不生效）。
+  // ⚠️ 用 `primary`：primary 在 macOS 上映射 meta(Cmd)、其余平台映射
+  //    control —— 与内核既有命令（Ctrl/Cmd+/ 打开快捷键表）一致。
+  //
+  // ⚠️⚠️ **为什么是 Ctrl/Cmd+Shift+T 而不是 Ctrl+T**（2026-10-18 用户决定）：
+  //    内核自带的 `browser.new`（侧栏浏览器「新建标签页」）
+  //    （`@deepseek-ai/dsh-client-ui-sidebar-browser` 注册）在
+  //    `desktop:macos|windows|linux` 默认就是 `primary + KeyT`。
+  //    而我们这条**先**注册成功过（EPE 的 immediately=true 加载更早），于是内核那条
+  //    反过来被拒 —— 也就是说 Ctrl+T 抢的是内核既有能力，代价是用户失去
+  //    「新建浏览器标签页」的快捷键。用户明确要求**避让**：让出 Ctrl+T 还给它，
+  //    我们把键位改成 Ctrl/Cmd+Shift+T。
+  //
+  // ⚠️ 候选键位是用内核自己的 `bindingIssue()` 源码验证过的，别凭感觉改：
+  //      · `Shift+T`（单 Shift）**不可用** —— 内核显式拒绝：
+  //        `if (modifiers.length === 0 || modifiers.every(m => m === 'shift')) return 'modifier-required'`。
+  //        desktop:macos/windows 会在函数开头提前 return null（放行），但
+  //        **desktop:linux 会落到这条**，而 register() 是**逐组校验、任一组失败
+  //        则整条命令注册失败** —— 在 Linux 上等于根本没注册上。
+  //      · `Alt+T` 合法且当前无冲突，但 `Alt+字母` 最容易被窗口管理器 /
+  //        输入法 / 菜单助记键抢（本机 niri 就有一堆 `Alt+字母` 绑定），故不选。
+  //      · `Ctrl+Shift+T` 三平台合法、当前无冲突，保留 Ctrl 的手感。
+  //
+  // ⚠️ 只能声明 `desktop:*`，**绝对不能带 `web:*`**：
+  //    内核 `isWebBindingAllowed()` 对 web 端只放行 primary+Slash /
+  //    primary+Shift+Comma / primary+Shift+Period 三种，其它组合判 unsupported-browser，
+  //    而同样「任一组失败则整条命令失败」。实测踩过（启动报告里是
+  //    `Unsupported Web shortcut: ...cycle-mode`，Ctrl+T 于是落到内核浏览器那条上）。
   guardStep(failures, 'shortcut:cycle-mode', () => {
     /**
      * 注册本项目自己的命令。
@@ -384,29 +409,11 @@ function applySources(ctx, failures) {
         id: 'dsh-enhanced-prompt-editor.cycle-mode',
         label: () => t('trigger.label'),
         aliases: ['enhanced prompt editor', 'cycle mode', '切换输入框模式'],
-        // ⚠️ **只能声明 desktop:*，绝对不能带 web:***。
-        // 内核 `isWebBindingAllowed()` 对 web 端只放行三种组合
-        // （primary+Slash / primary+Shift+Comma / primary+Shift+Period），
-        // 单修饰键 + KeyT 会被判 unsupported-browser；而 register() 是
-        // **逐组校验、任一组失败则整条命令注册失败**。
-        // 实测踩过：带上 web:* 后整条命令被拒（启动报告里是
-        // `Unsupported Web shortcut: ...cycle-mode`），Ctrl+T 于是落到
-        // 内核「打开侧栏浏览器」的绑定上 —— 看起来像被内核占了，其实是自己没注册上。
-        //
-        // ⚠️⚠️ 另一个**真实冲突**：内核自带的 `browser.new`（侧栏浏览器
-        // 「新建标签页」）在 desktop 三平台默认也是 `primary + KeyT`。
-        // `ShortcutRegistry.register()` 一旦发现键位重叠就抛
-        // `Conflicting shortcut defaults: <本命令> and browser.new`，整条命令
-        // 注册失败（启动报告里能看到，localStorage leveldb 里也留过记录）。
-        // 这不是本插件能单方面解决的（内核命令不可改），所以：
-        //   ① 失败会在启动报告里显形，不再静默；
-        //   ② 用户在「设置 → 快捷键」里改键即可（命令注册成功后就能改）；
-        //   ③ 真被拒时用户还可以用 T 按钮，功能不丢；
-        //   ④ 设置卡片里有「启用」开关，冲突时可以直接关掉。
+        // 键位理由见本块顶部注释（为何让出 Ctrl+T、为何不用 Shift+T）。
         defaults: {
-          'desktop:macos': { code: 'KeyT', modifiers: ['primary'] },
-          'desktop:windows': { code: 'KeyT', modifiers: ['primary'] },
-          'desktop:linux': { code: 'KeyT', modifiers: ['primary'] },
+          'desktop:macos': { code: 'KeyT', modifiers: ['primary', 'shift'] },
+          'desktop:windows': { code: 'KeyT', modifiers: ['primary', 'shift'] },
+          'desktop:linux': { code: 'KeyT', modifiers: ['primary', 'shift'] },
         },
         // 三个 region 全要：输入框（editable）/ 页面（page）/ 终端（terminal）
         regions: ['page', 'editable', 'terminal'],

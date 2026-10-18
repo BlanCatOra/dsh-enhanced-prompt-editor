@@ -140,26 +140,62 @@ md5sum lib/client.js ~/.dsh/profiles/desktop/node_modules/dsh-enhanced-prompt-ed
 （`src/native-switches.js`），切换即时生效、不点保存。
 宿主 schema 里仍保留这些字段作为保留位（将来修好可搬回）。
 
-### 5.1b 内核 `browser.new` 也占 `Ctrl+T`，注册会整条被拒
+### 5.1b 快捷键键位：Ctrl+T 归内核，本插件用 Ctrl/Cmd+Shift+T（**不要改回去**）
 
-实测（localStorage leveldb 里 2026-10-18 的启动报告）：
+内核 `browser.new`（侧栏浏览器「新建标签页」，由
+`@deepseek-ai/dsh-client-ui-sidebar-browser` 注册）在
+`desktop:macos|windows|linux` 默认就是 `primary + KeyT`；
+web 端是 `primary+alt+KeyT`。
+
+`ShortcutRegistry.register()` 逐组校验 6 个 `runtime:platform`，
+发现键位重叠就抛 `Conflicting shortcut defaults: <A> and <B>`，
+**整条命令注册失败** —— 不是「两个都触发」。
+
+实测记录（localStorage leveldb，2026-10-18 启动报告，两个方向都出现过）：
 
 ```
-where:   shortcut:cycle-mode
-message: Conflicting shortcut defaults: dsh-enhanced-prompt-editor.cycle-mode
-         and browser.new (desktop:macos)
+Conflicting shortcut defaults: dsh-enhanced-prompt-editor.cycle-mode and browser.new
 ```
 
-- 内核 `@deepseek-ai/dsh-client-ui-sidebar-browser` 注册的 `browser.new`
-  （侧栏浏览器「新建标签页」）在 `desktop:macos|windows|linux` 默认就是
-  `primary + KeyT`；web 端是 `primary+alt+KeyT`。
-- `ShortcutRegistry.register()` 逐组校验，发现键位重叠就抛错，**整条命令注册失败**
-  —— 不是「两个都触发」，是「本插件那条根本没进去」。
-- **插件无法解决**：内核命令不可改、也没有「后注册者覆盖」的语义。可行出路只有两条：
-  ① 用户在「设置 → 快捷键」里给本命令改键（前提是命令已注册成功）；
-  ② 关掉插件页面里的「启用 `Ctrl/Cmd+T` 快捷键」。
-- ⚠️ 注册失败**必须**记进启动报告（`guardStep(failures, 'shortcut:cycle-mode:register', ...)`），
+**⚠️ 关键教训：谁先注册谁赢，而不是「插件赢」。** EPE 的
+`dsh.client.immediately: true` 加载更早，所以曾出现「EPE 注册成功、
+内核 browser.new 反被拒」—— 结果是用户**失去**「新建浏览器标签页」的快捷键。
+用户 2026-10-18 明确要求**避让**，因此本插件改用 `primary + shift + KeyT`：
+
+| 键位 | 合法性（desktop 三平台） | 结论 |
+|---|---|---|
+| `Ctrl+T`（single primary） | 合法，但与内核 `browser.new` 冲突 | ❌ 抢宿主能力，**已让出** |
+| `Shift+T`（纯 shift） | **desktop:linux 判 `modifier-required`** | ❌ 不可用 |
+| `Alt+T` | 合法，当前无冲突 | ⚠️ 可用但易被 WM/输入法抢 |
+| **`Ctrl+Shift+T`** | 合法，当前无冲突 | ✅ **当前采用** |
+
+为什么 `Shift+T` 不行（别凭直觉改）：
+
+```js
+if (modifiers.length === 0 || modifiers.every((m) => m === 'shift')) return 'modifier-required';
+```
+
+`desktop:macos` / `desktop:windows` 会在 `bindingIssue()` 开头提前
+`return null`（放行），但 **`desktop:linux` 会落到这条拒绝**，
+而 register() 任一组失败即整条失败 —— 在 Linux 上等于根本没注册。
+
+换成别的键位前，**必须**用内核自己的 `bindingIssue()` 逐组验证，
+并检查与下表内核既有键位是否重叠（`overlappingBindings()` 只比对修饰键集合相同的）：
+
+| 命令 | desktop 键位 |
+|---|---|
+| `browser.new` | primary+KeyT |
+| `settings.open` | primary+Comma |
+| `shortcuts.open` | primary+Slash |
+| `sidebar.left.toggle` | primary+KeyB |
+| `sidebar.right.toggle` | primary+alt+KeyB |
+| `terminal.new` | control+Backquote |
+| `workspace.files` | primary+KeyP |
+| `workspace.openLocal` | primary+alt+KeyO |
+
+- 注册失败**必须**记进启动报告（`guardStep(failures, 'shortcut:cycle-mode:register', ...)`），
   否则用户只会看到「按了没反应」而无法归因。这条是本仓库反复踩的「静默失效」模式。
+- 键位在「设置 → 快捷键」里可由用户改（注册成功后才可改），所以这里给的是**默认值**。
 
 ### 5.2 DSH 的崩溃对话框不可信，「Web authentication failed」是兜底文案
 
@@ -293,7 +329,7 @@ src/
   client.js           客户端入口：apply() 装配所有表面
   plugin-card.js      插件详情页的设置卡片（primitives 拼装）
   settings-face.js    设置面（volatile 折叠 + 默认值收敛）
-  native-switches.js  客户端开关存储（原生 deck / 原生高级回车 / Ctrl+T 快捷键开关）
+  native-switches.js  客户端开关存储（原生 deck / 原生高级回车 / Ctrl+Shift+T 快捷键开关）
   mode-controller.js  native / editor / extended 三态 + 插槽 hooks 快照源
   native-composer.js  扩展输入框与「原生高级回车」的 DOM 控制器
   extended-bar.js     deck（符号/缩进工具条）+ 行号沟槽
