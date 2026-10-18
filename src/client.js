@@ -368,13 +368,18 @@ function applySources(ctx, failures) {
           id: 'dsh-enhanced-prompt-editor.cycle-mode',
           label: () => t('trigger.label'),
           aliases: ['enhanced prompt editor', 'cycle mode', '切换输入框模式'],
+          // ⚠️ **只能声明 desktop:*，绝对不能带 web:***。
+          // 内核 `isWebBindingAllowed()` 对 web 端只放行三种组合
+          // （primary+Slash / primary+Shift+Comma / primary+Shift+Period），
+          // 单修饰键 + KeyT 会被判 unsupported-browser；而 register() 是
+          // **逐组校验、任一组失败则整条命令注册失败**。
+          // 实测踩过：带上 web:* 后整条命令被拒（启动报告里是
+          // `Unsupported Web shortcut: ...cycle-mode`），Ctrl+T 于是落到
+          // 内核「打开侧栏浏览器」的绑定上 —— 看起来像被内核占了，其实是自己没注册上。
           defaults: {
             'desktop:macos': { code: 'KeyT', modifiers: ['primary'] },
             'desktop:windows': { code: 'KeyT', modifiers: ['primary'] },
             'desktop:linux': { code: 'KeyT', modifiers: ['primary'] },
-            'web:macos': { code: 'KeyT', modifiers: ['primary'] },
-            'web:windows': { code: 'KeyT', modifiers: ['primary'] },
-            'web:linux': { code: 'KeyT', modifiers: ['primary'] },
           },
           // 三个 region 全要：输入框（editable）/ 页面（page）/ 终端（terminal）
           regions: ['page', 'editable', 'terminal'],

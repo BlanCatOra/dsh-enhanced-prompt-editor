@@ -1773,13 +1773,24 @@ test('Ctrl+T 注册为官方快捷键命令：等价于点 T 控件，且在输�
   assert.ok(command !== undefined, '必须注册 id 为 dsh-enhanced-prompt-editor.cycle-mode 的快捷键命令');
 
   // ① 键位：Ctrl+T（跨平台用 primary：macOS 映射 Cmd，其余映射 Ctrl）
-  for (const runtime of ['desktop', 'web']) {
-    for (const platform of ['macos', 'windows', 'linux']) {
-      const binding = command.defaults?.[`${runtime}:${platform}`];
-      assert.ok(binding !== undefined, `缺少 ${runtime}:${platform} 的默认键位`);
-      assert.equal(binding.code, 'KeyT', `${runtime}:${platform} 的物理键必须是 KeyT`);
-      assert.deepEqual(binding.modifiers, ['primary'], '修饰键必须是 primary（Ctrl/Cmd）');
-    }
+  for (const platform of ['macos', 'windows', 'linux']) {
+    const binding = command.defaults?.[`desktop:${platform}`];
+    assert.ok(binding !== undefined, `缺少 desktop:${platform} 的默认键位`);
+    assert.equal(binding.code, 'KeyT', `desktop:${platform} 的物理键必须是 KeyT`);
+    assert.deepEqual(binding.modifiers, ['primary'], '修饰键必须是 primary（Ctrl/Cmd）');
+  }
+
+  // ①b ⚠️ **绝不能声明 web:* 键位**（真实故障，已踩）：
+  // 内核 isWebBindingAllowed() 对 web 端只放行 primary+Slash / primary+Shift+Comma /
+  // primary+Shift+Period 三种；单修饰键 + KeyT 判 unsupported-browser。而 register()
+  // 是**逐组校验、任一组失败则整条命令注册失败** —— 带上 web:* 后整条命令被拒，
+  // Ctrl+T 落到内核「打开侧栏浏览器」的绑定上（看起来像被内核占了，其实是自己没注册上）。
+  for (const platform of ['macos', 'windows', 'linux']) {
+    assert.equal(
+      command.defaults?.[`web:${platform}`],
+      undefined,
+      `⚠️ 不得声明 web:${platform}：web 端不允许单修饰键+KeyT，会让整条命令注册失败`,
+    );
   }
 
   // ② ⚠️ region 必须包含 editable：用户就是在输入框里按的。
